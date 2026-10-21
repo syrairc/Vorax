@@ -51,12 +51,14 @@ public sealed class Main : Plugin<Settings>
             ("Rewards", $"{state.RewardsTaken} / {state.RewardsTotal}", GameColors.Text),
             ("Rerolls", state.Rerolls.ToString(), GameColors.Text),
             ("Monster slots", state.MonsterSlots.ToString(), GameColors.Text),
+            ("Reward bonus", $"+{state.RewardBonusPercent}%", GameColors.Text),
             ("Chests", string.Join(" ", state.Chests), GameColors.TextDim),
             ("Monsters", state.Monsters.Length.ToString(), GameColors.Gold),
         };
         rows.AddRange(state.Monsters.Select(m => ((string, string, Color))($"  {m.Slot}  {m.Name} (id {m.Id}, species {m.Species}, rarity {m.Rarity} {m.RarityName})", $"{m.Count} x {m.Activity} = {m.Total}", GameColors.Text)));
         AddCards(rows, "Offered", state.Offered, width, style);
         AddCards(rows, "Instruments", state.Instruments, width, style);
+        AddCards(rows, "Protocols", state.Protocols, width, style);
         return rows;
     }
 

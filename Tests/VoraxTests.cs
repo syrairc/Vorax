@@ -23,7 +23,11 @@ public sealed class VoraxTests
     static VoraxState Sample() => new(VoraxPhase.Round, 2, 13, 761, 2000, 0, 2, 3, 6,
         [new VoraxMonster(0, 14, 202, 4, 1, 300) { Name = "Bone Warden" }, new VoraxMonster(1, 3, 201, 2, 24, 5) { Name = "Putrid Fly", RarityName = "Magic" }],
         [new VoraxCard(0, 203, VoraxCardKind.Potion, 2) { Name = "Eggshell Powder", Description = "+25 Quantity to 1 random group(s) of monster. If they are Pests, add 1 group(s) of Pests with the same name and +25 to their Quantity", TypeName = "Potion" }],
-        [new VoraxCard(0, 101, VoraxCardKind.Instrument, 0) { Name = "Aberrant Sprout", TypeName = "Surgical Instrument" }], [0, 0, 0, 0, 0, 0]);
+        [new VoraxCard(0, 101, VoraxCardKind.Instrument, 0) { Name = "Aberrant Sprout", TypeName = "Surgical Instrument" }], [0, 0, 0, 0, 0, 0])
+    {
+        Protocols = [new VoraxCard(0, 3, VoraxCardKind.Modifier, 1) { Name = "Spinal Cord Stimulation", TypeName = "Surgical Protocol" }],
+        RewardBonusPercent = 20,
+    };
 
     static int Frame(VoraxState? state, Settings? settings = null)
     {
@@ -56,5 +60,7 @@ public sealed class VoraxTests
         Check.That(rows.Any(r => r.Left.Contains("Eggshell Powder") && r.Right == "Potion / Potion"), "offered card");
         Check.That(rows.Count(r => r.Left.StartsWith("      ")) >= 2, "description wraps");
         Check.That(rows.Any(r => r.Left.Contains("Aberrant Sprout")), "instrument");
+        Check.That(rows.Any(r => r.Left.Contains("Spinal Cord Stimulation") && r.Right == "Modifier / Surgical Protocol"), "protocol");
+        Check.That(rows.Any(r => r.Left == "Reward bonus" && r.Right == "+20%"), "reward bonus");
     }
 }
