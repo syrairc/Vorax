@@ -39,6 +39,15 @@ public sealed class StateMapperTests
     }
 
     [Test]
+    public void SpotCheckedGameIdsLandOnTheirSimIds()
+    {
+        foreach (var (game, sim) in new[] { (101, 30), (102, 23), (206, 14), (305, 0), (406, 41) })
+            Check.That(GameIds.TryPotion(game, out var s) && s == sim, $"potion {game}");
+        foreach (var (game, sim) in new[] { (217, 25), (101, 7) })
+            Check.That(GameIds.TryInstrument(game, out var s) && s == sim, $"instrument {game}");
+    }
+
+    [Test]
     public void StartSetupInstrumentsAreSkippedNotErrors()
     {
         var result = StateMapper.Map(State(instruments: [Instrument(1), Instrument(4), Instrument(101)]), default);
@@ -113,10 +122,10 @@ public sealed class StateMapperTests
     }
 
     [Test]
-    public void AMonsterKitIsAnErrorNamingTheId()
+    public void AnUnknownBundleIsAnErrorNamingTheId()
     {
         Check.That(!StateMapper.TryPotions([new VoraxCard(0, 3, VoraxCardKind.Bundle, 0)], out _, out var error));
-        Check.That(error!.Contains('3'));
+        Check.That(error!.Contains("unknown bundle id 3"));
     }
 
     [Test]

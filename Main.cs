@@ -18,6 +18,7 @@ public sealed class Main : Plugin<Settings>
     readonly TextStyle _style = TextStyle.Hud();
     readonly Overlay _overlay = new();
     int _unusedWidth, _unusedHeight;
+    readonly Calibration _calibration = new(Log.Info);
     Worker? _worker;
     (int, int, int) _workerKey;
 
@@ -40,6 +41,7 @@ public sealed class Main : Plugin<Settings>
         }
 
         _worker.Submit(state, StrategyFor(Settings.Mode));
+        if (Settings.Debug) _calibration.Observe(state);
     }
 
     public override void Dispose() => _worker?.Dispose();

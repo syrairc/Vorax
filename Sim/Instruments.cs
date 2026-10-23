@@ -126,6 +126,7 @@ public static class Instruments
         },
         [16] = (s, events, _) =>
         {
+            // The JS boosts at the overflow call itself, here it boosts after instruments 1-15 have run
             for (var n = events.Count(e => e.Kind == EventKind.AddOverflow); n > 0; n--)
             {
                 var all = NonEmpty(s);

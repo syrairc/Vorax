@@ -240,6 +240,93 @@ public sealed class PotionTests
     }
 
     [Test]
+    public void FreshMarrowMutatesUpToThreeNonAemberonsAndBoostsAemberons()
+    {
+        var one = Board(Pest);
+        Use(one, 5);
+        Check.Equal((Species.Aemberon, 1, 36 + 42), (one.Dishes[0]!.Value.Species, one.Dishes[0]!.Value.Activity, one.Dishes[0]!.Value.Quantity));
+
+        var many = Board(Pest, Pest, Pest, Aemberon);
+        Use(many, 5);
+        Check.That(many.Dishes.Where(d => d is not null).All(d => d!.Value.Species == Species.Aemberon));
+        Check.Equal(4 * 36 + (2 + 3 + 3) * 42, many.Dishes.Sum(d => d?.Quantity ?? 0));
+
+        var already = Board(Aemberon);
+        Use(already, 5);
+        Check.Equal((1, 36), (already.Dishes[0]!.Value.Activity, already.Dishes[0]!.Value.Quantity));
+    }
+
+    [Test]
+    public void BoneGrowthAddsFortyAndASentryAlsoEatsANonSentry()
+    {
+        var pest = Board(Pest);
+        Use(pest, 10);
+        Check.Equal((1, 36 + 40), (pest.Dishes[0]!.Value.Activity, pest.Dishes[0]!.Value.Quantity));
+
+        var sentry = Board(Sentry);
+        Use(sentry, 10);
+        Check.Equal(36 + 40 + 127, sentry.Dishes[0]!.Value.Quantity);
+
+        var both = Board(Sentry, Pest);
+        Use(both, 10);
+        var sentryHit = both.Dishes[1] is null;
+        Check.Equal(sentryHit ? 36 + 40 + 127 : 36, both.Dishes[0]!.Value.Quantity);
+        Check.Equal(sentryHit ? 1 : 2, Count(both));
+    }
+
+    [Test]
+    public void GrayMatterAddsFortyOneThenMutatesAndMaybeBecomesAemberonPlusThirty()
+    {
+        var s = Board(Pest);
+        Use(s, 11);
+        var m = s.Dishes[0]!.Value;
+        Check.Equal(36, m.Quantity);
+        Check.That(m.Activity == 42 || (m.Activity == 72 && m.Species == Species.Aemberon), $"activity {m.Activity} {m.Species}");
+    }
+
+    [Test]
+    public void HollowSpinalAddsFortyOneToTheTargetAndMaybeMakesItAemberon()
+    {
+        var s = Board(Pest, Agito);
+        Use(s, 12, 1);
+        Check.Equal(1, s.Dishes[0]!.Value.Activity);
+        Check.Equal(Species.Pests, s.Dishes[0]!.Value.Species);
+        var m = s.Dishes[1]!.Value;
+        Check.Equal((42, 36), (m.Activity, m.Quantity));
+        Check.That(m.Species is Species.Agito or Species.Aemberon, $"{m.Species}");
+    }
+
+    [Test]
+    public void EntrancingTinctureAwakensTheTargetOneRank()
+    {
+        var s = Board(Pest, Monster.Fresh(Species.Agito, Rarity.Magic), Monster.Fresh(Species.Aemberon, Rarity.Boss));
+        Use(s, 20, 0);
+        Use(s, 20, 1);
+        Use(s, 20, 2);
+        Check.Equal((Rarity.Magic, 61), (s.Dishes[0]!.Value.Rarity, s.Dishes[0]!.Value.Activity));
+        Check.Equal((Rarity.Rare, 125), (s.Dishes[1]!.Value.Rarity, s.Dishes[1]!.Value.Activity));
+        Check.Equal((Rarity.Boss, 420), (s.Dishes[2]!.Value.Rarity, s.Dishes[2]!.Value.Activity));
+    }
+
+    [Test]
+    public void AnestheticTincturesMutateTheTarget()
+    {
+        var agito = Board(Pest, Aemberon);
+        Use(agito, 26, 0);
+        var m = agito.Dishes[0]!.Value;
+        Check.Equal((Species.Agito, Rarity.Magic, 61, 36), (m.Species, m.Rarity, m.Activity, m.Quantity));
+        Check.Equal(Species.Aemberon, agito.Dishes[1]!.Value.Species);
+
+        var aemberon = Board(Pest, Agito, Sentry);
+        Use(aemberon, 29, 0);
+        Check.Equal(Species.Aemberon, aemberon.Dishes[0]!.Value.Species);
+        Check.That(aemberon.Dishes[1]!.Value.Species is Species.Agito or Species.Aemberon);
+        Check.That(aemberon.Dishes[2]!.Value.Species is Species.BoneSentry or Species.Aemberon);
+        Check.That(aemberon.Dishes.Count(d => d is { Species: Species.Aemberon }) <= 2, "at most one extra group");
+        Check.That(aemberon.Dishes.All(d => d is null || d.Value.Activity == 1));
+    }
+
+    [Test]
     public void RousingSaltsAddsOneElevenToBothStats()
     {
         var s = Board(Pest, Pest);

@@ -42,7 +42,7 @@ public static class StateMapper
             if (card.Kind == VoraxCardKind.Bundle)
             {
                 if (GameIds.TryKit(card.Id, out _)) continue;
-                error = $"monster kit id {card.Id}";
+                error = $"unknown bundle id {card.Id}";
                 return false;
             }
 

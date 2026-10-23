@@ -36,7 +36,7 @@ public sealed class Settings : PluginSettings
         Setting.Checkbox("Enabled", ref Enabled);
         Setting.Checkbox("Show highlights", ref ShowHighlights, "Frames the card, targets and buttons to click");
         Setting.Checkbox("Show panel", ref ShowPanel, "The advice, its reason and the simulated value of every option");
-        Setting.Checkbox("Debug rows", ref Debug, "Every value the reader sees, for checking against the game");
+        Setting.Checkbox("Debug rows", ref Debug, "Every value the reader sees, for checking against the game - also logs one simulator check per round");
         Setting.Checkbox("Lock", ref Lock, "A locked panel ignores the mouse - hold the move key to drag it anyway");
         Setting.Hotkey("Move key", ref MoveKey, "Hold to move the panel while locked");
         DrawMode();

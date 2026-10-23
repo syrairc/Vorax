@@ -105,7 +105,7 @@ public sealed class InstrumentTests
     }
 
     [Test]
-    public void ChainedEventsStopAfterFourPasses()
+    public void EventDrivenCascadeTerminatesWithBoundedEvents()
     {
         var s = Board(Pest);
         s.Add(Pest);
@@ -252,6 +252,44 @@ public sealed class InstrumentTests
 
         var again = Round.Play(afterBoth, -1, [], new Rng(1));
         Check.Equal(2, again.PendingInstrumentPicks);
+    }
+
+    [Test]
+    public void ThresholdsTriggerAtExactlyEightAndTwentyEightThousand()
+    {
+        foreach (var (total, passed1, picks1) in new[] { (7999, false, 0), (8000, true, 1), (8001, true, 1) })
+        {
+            var s = Board(new Monster(Species.Pests, Rarity.Normal, 1, total));
+            s.Round = 1;
+            var next = Round.Play(s, -1, [], new Rng(1));
+            Check.Equal((passed1, picks1, false), (next.Passed8000, next.PendingInstrumentPicks, next.Passed28000));
+        }
+
+        foreach (var (total, passed2, picks2) in new[] { (27999, false, 0), (28000, true, 1) })
+        {
+            var s = Board(new Monster(Species.Pests, Rarity.Normal, 1, total));
+            s.Round = 5;
+            s.Passed8000 = true;
+            var next = Round.Play(s, -1, [], new Rng(1));
+            Check.Equal((passed2, picks2), (next.Passed28000, next.PendingInstrumentPicks));
+        }
+    }
+
+    [Test]
+    public void PlayLeavesTheInputStateUntouched()
+    {
+        var s = Board(new Monster(Species.Pests, Rarity.Normal, 28, 276), Pest);
+        s.Round = 1;
+        s.Instruments.Add(17);
+        s.Events.Add(new(EventKind.Add, 1, Species.Pests, Species.Pests));
+        var dishes = s.Dishes.ToArray();
+        var next = Round.Play(s, 0, [], new Rng(1));
+        Check.That(next.PendingInstrumentPicks == 1 && next.Passed8000, "the play crossed the threshold");
+        Check.That(s.Dishes.SequenceEqual(dishes), "dishes");
+        Check.Equal(1, s.Events.Count);
+        Check.Equal(0, s.PendingInstrumentPicks);
+        Check.That(!s.Passed8000, "passed flag");
+        Check.Equal(1, s.Round);
     }
 
     [Test]
