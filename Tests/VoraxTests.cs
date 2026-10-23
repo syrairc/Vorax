@@ -140,4 +140,72 @@ public sealed class VoraxTests
         Check.Equal(200, new Settings { Rollouts = 50 }.ClampedRollouts);
         Check.Equal(400, new Settings { Rollouts = 400 }.ClampedRollouts);
     }
+
+    static Main WithSettings(Settings settings)
+    {
+        var main = new Main();
+        typeof(Plugin<Settings>).GetProperty("Settings")!.GetSetMethod(true)!.Invoke(main, [settings]);
+        return main;
+    }
+
+    [Test]
+    public void TickCreatesTheWorkerAndKeepsItAcrossModeChanges()
+    {
+        TestGame.Set(new GameState { Vorax = Sample() });
+        try
+        {
+            var settings = new Settings();
+            var main = WithSettings(settings);
+            main.Tick();
+            var worker = main.CurrentWorker;
+            Check.That(worker is not null, "worker created");
+            settings.Mode = Registry.All()[0].Name;
+            main.Tick();
+            Check.That(ReferenceEquals(worker, main.CurrentWorker), "mode change keeps the worker");
+            main.Dispose();
+        }
+        finally { TestGame.Set(GameState.Empty); }
+    }
+
+    [Test]
+    public void TickRebuildsTheWorkerOnARolloutsChange()
+    {
+        TestGame.Set(new GameState { Vorax = Sample() });
+        try
+        {
+            var settings = new Settings();
+            var main = WithSettings(settings);
+            main.Tick();
+            var first = main.CurrentWorker;
+            settings.Rollouts = 400;
+            main.Tick();
+            Check.That(main.CurrentWorker is not null && !ReferenceEquals(first, main.CurrentWorker), "new worker");
+            main.Dispose();
+        }
+        finally { TestGame.Set(GameState.Empty); }
+    }
+
+    [Test]
+    public void DisposeStopsTheWorker()
+    {
+        TestGame.Set(new GameState { Vorax = Sample() });
+        try
+        {
+            var main = WithSettings(new Settings());
+            main.Tick();
+            var worker = main.CurrentWorker!;
+            Check.That(worker.ThreadAlive, "thread running");
+            main.Dispose();
+            Check.That(!worker.ThreadAlive, "thread stopped");
+        }
+        finally { TestGame.Set(GameState.Empty); }
+    }
+
+    [Test]
+    public void BudgetAndMarginClamp()
+    {
+        Check.Equal(100, new Settings { BudgetMilliseconds = -5 }.ClampedBudget);
+        Check.Equal(0, new Settings { RerollMargin = -3 }.ClampedMargin);
+        Check.Equal(100, new Settings { RerollMargin = 900 }.ClampedMargin);
+    }
 }

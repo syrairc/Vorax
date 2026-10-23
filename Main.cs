@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Numerics;
+using System.Threading.Tasks;
 using EmberHUD;
 using EmberHUD.Ui;
 using Vorax.Sim;
@@ -18,9 +19,11 @@ public sealed class Main : Plugin<Settings>
     readonly Overlay _overlay = new();
     int _unusedWidth, _unusedHeight;
     Worker? _worker;
-    (string, int, int, int) _workerKey;
+    (int, int, int) _workerKey;
 
     internal Advice? AdviceOverride;
+
+    internal Worker? CurrentWorker => _worker;
 
     internal Strategy? StrategyFor(string? mode) => mode == Settings.SimulatorMode ? null : Registry.ByName(mode);
 
@@ -28,12 +31,12 @@ public sealed class Main : Plugin<Settings>
     {
         Game.WantVorax();
         if (!Settings.Enabled || Game.State.Vorax is not { } state) return;
-        var key = (Settings.Mode, Settings.ClampedRollouts, Settings.BudgetMilliseconds, Settings.RerollMargin);
+        var key = (Settings.ClampedRollouts, Settings.ClampedBudget, Settings.ClampedMargin);
         if (_worker is null || key != _workerKey)
         {
-            _worker?.Dispose();
+            if (_worker is { } old) Task.Run(old.Dispose);
             _workerKey = key;
-            _worker = new(new Engine(new(key.Item2, key.Item3, key.Item4 / 100.0), new Rng((ulong)Environment.TickCount64)));
+            _worker = new(new Engine(new(key.Item1, key.Item2, key.Item3 / 100.0), new Rng((ulong)Environment.TickCount64)));
         }
 
         _worker.Submit(state, StrategyFor(Settings.Mode));
@@ -52,7 +55,14 @@ public sealed class Main : Plugin<Settings>
     void DrawMarks(VoraxState state, Advice? advice)
     {
         var parts = Game.State.Ui.Panels.FirstOrDefault(panel => panel.Name == GamePanelName).Parts ?? [];
-        foreach (var mark in Highlight.Marks(state, advice, parts)) Draw.GlowRect(mark.Min, mark.Max, mark.Strategy ? Settings.StrategyColour : Settings.SimulatorColour, 3);
+        foreach (var mark in Highlight.Marks(state, advice, parts))
+        {
+            var colour = mark.Strategy ? Settings.StrategyColour : Settings.SimulatorColour;
+            Draw.GlowRect(mark.Min, mark.Max, colour, 3);
+            var label = _style.Clone();
+            label.Color = colour;
+            Draw.Text(mark.Label, new Vector2(mark.Min.X, mark.Min.Y - Draw.RowHeight(_style)), label);
+        }
     }
 
     void DrawPanel(VoraxState state, Advice? advice)

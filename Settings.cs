@@ -28,6 +28,8 @@ public sealed class Settings : PluginSettings
     public Color SimulatorColour = Color.FromArgb(0xFF, 0x5B, 0xB8, 0xFF);
 
     internal int ClampedRollouts => Math.Max(MinRollouts, Rollouts);
+    internal int ClampedBudget => Math.Max(100, BudgetMilliseconds);
+    internal int ClampedMargin => Math.Clamp(RerollMargin, 0, 100);
 
     public override void Draw()
     {
