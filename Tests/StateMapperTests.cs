@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using EmberHUD;
 using EmberHUD.Testing;
@@ -126,5 +127,21 @@ public sealed class StateMapperTests
         Check.Equal(2, ids.Count);
         Check.Equal(30, ids[0]);
         Check.Equal(4, ids[1]);
+    }
+
+    [Test]
+    public void AcquiredRoundsLandOnTheirSimInstruments()
+    {
+        var options = new MapOptions(false, false, new Dictionary<int, int> { [216] = 3, [217] = 4 });
+        var s = StateMapper.Map(State(instruments: [Instrument(216), Instrument(217), Instrument(101)]), options).State!;
+        Check.Equal(3, s.AcquiredRound[19]);
+        Check.Equal(4, s.AcquiredRound[25]);
+        Check.That(!s.AcquiredRound.ContainsKey(7));
+    }
+
+    [Test]
+    public void WithoutAcquiredRoundsNothingIsRecorded()
+    {
+        Check.Equal(0, StateMapper.Map(State(instruments: [Instrument(216)]), default).State!.AcquiredRound.Count);
     }
 }

@@ -6,7 +6,7 @@ namespace Vorax.Sim;
 
 public sealed record MapResult(SimState? State, string? Error);
 
-public readonly record struct MapOptions(bool Passed8000, bool Passed28000);
+public readonly record struct MapOptions(bool Passed8000, bool Passed28000, IReadOnlyDictionary<int, int>? AcquiredRounds = null);
 
 public static class StateMapper
 {
@@ -25,7 +25,9 @@ public static class StateMapper
         {
             if (GameIds.IsStartSetup(card.Id)) continue;
             if (!GameIds.TryInstrument(card.Id, out var simId)) return Fail($"instrument id {card.Id}");
-            if (!sim.Instruments.Contains(simId)) sim.Instruments.Add(simId);
+            if (sim.Instruments.Contains(simId)) continue;
+            sim.Instruments.Add(simId);
+            if (options.AcquiredRounds is not null && options.AcquiredRounds.TryGetValue(card.Id, out var round)) sim.AcquiredRound[simId] = round;
         }
 
         return new(sim, null);
