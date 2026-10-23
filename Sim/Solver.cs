@@ -21,8 +21,6 @@ public static class Solver
     const int HandSamples = 5;
     const int FreshSamples = 16;
     const int MinRerollHands = 8;
-    const int FirstAdvancedInstrument = 9;
-    const int LastInstrument = 25;
 
     public static Ranking RankPotions(SimState state, IReadOnlyList<int> potionSimIds, SolveSettings settings, Func<SimState, double>? score, bool allowReroll, Rng rng, IReadOnlyList<KitDef?>? kits = null)
     {
@@ -136,9 +134,10 @@ public static class Solver
         void TakeInstrument(SimState s)
         {
             s.PendingInstrumentPicks--;
-            var open = Enumerable.Range(FirstAdvancedInstrument, LastInstrument - FirstAdvancedInstrument + 1).Where(id => !s.Instruments.Contains(id)).ToList();
-            if (open.Count == 0) return;
-            var id = rng.Pick(open);
+            if (s.Instruments.Count >= Round.MaxInstruments) return;
+            var offers = DrawModel.DrawInstruments(rng, s.Instruments);
+            if (offers.Length == 0) return;
+            var id = offers.MaxBy(DrawModel.InstrumentStrength);
             s.Instruments.Add(id);
             s.AcquiredRound[id] = s.Round;
         }

@@ -24,7 +24,7 @@ public sealed class SolverTests
     [Test]
     public void TargetPicksTheGroupWithTheMostActivityForQuantityPotions()
     {
-        var board = Board(Normal(Species.Pests, 2), Normal(Species.Pests, 9), Normal(Species.Pests, 4));
+        var board = Board(Normal(Species.Pests, 2), Normal(Species.Pests, 200), Normal(Species.Pests, 4));
         var options = Solver.TargetOptions(board, 17);
         var ranking = Solver.RankTargets(board, 17, Quick, null, new Rng(2));
         Check.Equal(options.Count, ranking.Values.Length);
@@ -80,7 +80,7 @@ public sealed class SolverTests
     [Test]
     public void CustomScoreChangesTheWinner()
     {
-        var board = Board(Normal(Species.Pests), Normal(Species.Agito));
+        var board = Board(Normal(Species.Pests, 100), Normal(Species.Agito));
         var byActivity = Solver.RankPotions(board, [17, 7], Quick, null, false, new Rng(7));
         double PestGroups(SimState s) => s.Dishes.Count(d => d is { Species: Species.Pests });
         var byPests = Solver.RankPotions(board, [17, 7], Quick, PestGroups, false, new Rng(7));
@@ -135,12 +135,13 @@ public sealed class SolverTests
     }
 
     [Test]
-    public void DrawModelDefaultsAreUniformWithOnePercentSupreme()
+    public void DrawModelDefaultsUseTheForkWeightsWithSupremeShare()
     {
         var pool = DrawModel.PotionPool(null);
         Check.That(pool.All(p => p.SimId is not (33 or 34 or 40)));
         Check.That(System.Math.Abs(pool.Sum(p => p.Weight) - 1.0) < 1e-9);
-        Check.That(System.Math.Abs(pool.Where(p => p.SimId is >= 35 and <= 39).Sum(p => p.Weight) - 0.01) < 1e-9);
+        Check.That(System.Math.Abs(pool.Where(p => p.SimId is >= 35 and <= 39 or 41).Sum(p => p.Weight) - 0.013) < 1e-9);
+        Check.That(pool.First(p => p.SimId == 31).Weight > pool.First(p => p.SimId == 7).Weight * 2.1);
         var real = DrawModel.PotionPool(new Dictionary<int, int> { [17] = 5, [7] = 1, [33] = 9 });
         Check.Equal(2, real.Count);
         Check.Equal(5.0, real.First(p => p.SimId == 17).Weight);

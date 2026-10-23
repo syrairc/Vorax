@@ -16,6 +16,7 @@ public sealed class EngineTests
     const int Xenopurge = 207;
     const int Spawning = 211;
     const int SentryLimb = 108;
+    const int PlaguePeat = 401;
     const int MoltingSkin = 302;
 
     static Engine NewEngine(SolveSettings? settings = null) => new(settings ?? Quick, new Rng(1));
@@ -70,7 +71,7 @@ public sealed class EngineTests
     [Test]
     public void SimulatorAdviceNamesTheBestPotion()
     {
-        var advice = NewEngine().Advise(Hand([Potion(Xenopurge), Potion(204), Potion(203)], XenopurgeBoard()), null, default)!;
+        var advice = NewEngine().Advise(Hand([Potion(Xenopurge), Potion(204), Potion(203)], XenopurgeBoard(), rerolls: 0), null, default)!;
         Check.Equal(Stage.Potion, advice.Stage);
         Check.That(advice.Error is null, advice.Error);
         Check.Equal(0, advice.Pick.Indexes[0]);
@@ -102,7 +103,7 @@ public sealed class EngineTests
     [Test]
     public void NullStrategyPickFallsBackToTheSimulator()
     {
-        var advice = NewEngine().Advise(Hand([Potion(Xenopurge), Potion(204), Potion(203)], XenopurgeBoard()), new Scripted(), default)!;
+        var advice = NewEngine().Advise(Hand([Potion(Xenopurge), Potion(204), Potion(203)], XenopurgeBoard(), rerolls: 0), new Scripted(), default)!;
         Check.Equal(AdviceSource.SimulatorFallback, advice.Source);
         Check.Equal("Scripted", advice.StrategyName);
         Check.Equal(0, advice.Pick.Indexes[0]);
@@ -218,7 +219,7 @@ public sealed class EngineTests
     public void SimulateWithCustomScoreChangesTheAnswer()
     {
         var offered = new[] { Potion(Xenopurge), Potion(Spawning) };
-        var board = new[] { Group(0, 201, 1, 36, 1), Group(1, 203, 1, 36, 1) };
+        var board = new[] { Group(0, 201, 1, 36, 1000), Group(1, 203, 1, 36, 1) };
         double PestsOnly(SimState s) => s.Dishes.Count(d => d is { Species: Species.Pests });
         var plain = NewEngine().Advise(Hand(offered, board), new Scripted(potion: c => c.Simulate(null, false)), default)!;
         var custom = NewEngine().Advise(Hand(offered, board), new Scripted(potion: c => c.Simulate(PestsOnly, false)), default)!;
@@ -297,7 +298,7 @@ public sealed class EngineTests
     public void APotionKitIsAValidPotionChoice()
     {
         var board = XenopurgeBoard();
-        var advice = NewEngine(OnlyXenopurge).Advise(Hand([Potion(SentryLimb), Kit(6)], board, rerolls: 0), null, default)!;
+        var advice = NewEngine(OnlyXenopurge).Advise(Hand([Potion(PlaguePeat), Kit(6)], board, rerolls: 0), null, default)!;
         Check.That(advice.Error is null, advice.Error);
         Check.Equal(Stage.Potion, advice.Stage);
         Check.That(advice.Pick.Indexes[0] == 1, $"{advice.Values![0]:0} vs {advice.Values[1]:0}");

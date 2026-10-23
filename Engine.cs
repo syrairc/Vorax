@@ -38,7 +38,7 @@ public sealed class Engine(SolveSettings settings, Rng rng)
         {
             var maxTargets = stage == Stage.Target ? (int)SelectedTargeting(state) : 0;
             VoraxCard? chosen = stage == Stage.Target ? state.Offered[SelectedIndex(state)] : null;
-            var context = new StrategyContext(state, stage, chosen, maxTargets, (score, allowReroll) => rank(score, allowReroll).Pick);
+            var context = new StrategyContext(state, stage, chosen, maxTargets, (score, allowReroll) => rank(score, allowReroll).Pick, sim, OfferedSimIds(state, stage), stage == Stage.Target ? SelectedIndex(state) : -1);
             try
             {
                 var pick = Ask(strategy, stage, context);
@@ -60,6 +60,20 @@ public sealed class Engine(SolveSettings settings, Rng rng)
         {
             return Failed(stage, name, $"simulator threw {e.GetType().Name}: {e.Message}");
         }
+    }
+
+    static int[]? OfferedSimIds(VoraxState state, Stage stage)
+    {
+        var ids = new int[state.Offered.Length];
+        for (var i = 0; i < ids.Length; i++)
+        {
+            var card = state.Offered[i];
+            var found = stage == Stage.Instrument ? GameIds.TryInstrument(card.Id, out ids[i])
+                : card.Kind == VoraxCardKind.Bundle ? GameIds.TryKitSimId(card.Id, out ids[i])
+                : GameIds.TryPotion(card.Id, out ids[i]);
+            if (!found) return null;
+        }
+        return ids;
     }
 
     string? LogOnce(string? error)

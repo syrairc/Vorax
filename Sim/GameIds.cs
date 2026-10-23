@@ -27,6 +27,11 @@ public static class GameIds
         [6] = new(5, [40, 44, 15, 1]),
     };
 
+    // bundle id -> the sim id of the same kit in a drawn hand (2 Small, 4 Rare Small, 6 Large)
+    static readonly Dictionary<int, int> KitSimIds = new() { [2] = 34, [4] = 40, [6] = 33 };
+
+    public static bool TryKitSimId(int bundleId, out int simId) => KitSimIds.TryGetValue(bundleId, out simId);
+
     public static bool TryPotion(int gameId, out int simId) => Potion.TryGetValue(gameId, out simId);
 
     public static bool TryInstrument(int gameId, out int simId) => Instrument.TryGetValue(gameId, out simId);

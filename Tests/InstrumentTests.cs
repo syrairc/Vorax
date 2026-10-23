@@ -95,6 +95,8 @@ public sealed class InstrumentTests
             s.Add(Pest);
             s.Dishes[0] = s.Dishes[0]!.Value with { Quantity = 276 };
             s.Instruments.AddRange([7, 12, 17]);
+            s.Rng = new Rng(seed);
+            foreach (var e in s.Events.ToList()) s.Dispatch(e);
             Round.EndRound(s, new Rng(seed));
             var a = s.Dishes[1]!.Value;
             Check.That(a.Species == Species.Aemberon ? a.Activity == 1 + 80 + 35 : a.Activity == 1);
@@ -160,13 +162,17 @@ public sealed class InstrumentTests
     }
 
     [Test]
-    public void TannedBeltNeedsNormalMagicAndBoss()
+    public void TannedBeltNeedsNormalMagicAndRareOrBoss()
     {
         var yes = Board(Pest, Monster.Fresh(Species.Pests, Rarity.Magic), Monster.Fresh(Species.Pests, Rarity.Boss));
         End(yes, 21);
         Check.Equal((21, 25, 320), (yes.Dishes[0]!.Value.Activity, yes.Dishes[1]!.Value.Activity, yes.Dishes[2]!.Value.Activity));
 
-        var no = Board(Pest, Monster.Fresh(Species.Pests, Rarity.Magic), Monster.Fresh(Species.Pests, Rarity.Rare));
+        var rare = Board(Pest, Monster.Fresh(Species.Pests, Rarity.Magic), Monster.Fresh(Species.Pests, Rarity.Rare));
+        End(rare, 21);
+        Check.Equal((21, 25, 35), (rare.Dishes[0]!.Value.Activity, rare.Dishes[1]!.Value.Activity, rare.Dishes[2]!.Value.Activity));
+
+        var no = Board(Pest, Monster.Fresh(Species.Pests, Rarity.Magic));
         End(no, 21);
         Check.Equal(1, no.Dishes[0]!.Value.Activity);
     }
@@ -314,9 +320,14 @@ public sealed class InstrumentTests
         Check.Equal(36L + 300L, s.TotalActivity);
     }
 
-    static void End(SimState s, int instrument)
+    // the board was built before the instrument was owned, so its events are replayed to the new owner before the round ends
+    static void End(SimState s, params int[] instruments)
     {
-        s.Instruments.Add(instrument);
+        var queued = s.Events.ToList();
+        s.Events.Clear();
+        s.Instruments.AddRange(instruments);
+        s.Rng = new Rng(5);
+        foreach (var e in queued) s.Dispatch(e);
         Round.EndRound(s, new Rng(5));
     }
 

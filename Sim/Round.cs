@@ -6,45 +6,46 @@ namespace Vorax.Sim;
 public static class Round
 {
     public const int Rounds = 13;
+    public const int PotionRounds = 10;
     public const int FirstThreshold = 8000;
     public const int SecondThreshold = 28000;
-    const int MaxCascadePasses = 4;
+    public const int MaxInstruments = 3;
 
     public static void EndRound(SimState state, Rng rng)
     {
-        var owned = state.Instruments.Order().ToList();
-        var seen = state.Events.Count;
-        var firstPass = state.Events.ToList();
-        foreach (var id in owned) Instruments.Apply(state, id, firstPass, rng);
-        for (var pass = 0; pass < MaxCascadePasses; pass++)
-        {
-            var fresh = state.Events.Skip(seen).ToList();
-            if (fresh.Count == 0) break;
-            seen = state.Events.Count;
-            foreach (var id in owned.Where(Instruments.EventDriven)) Instruments.Apply(state, id, fresh, rng);
-        }
+        state.Rng = rng;
+        foreach (var id in state.Instruments.Order().ToList())
+            if (!Instruments.EventDriven(id)) Instruments.EndOfRound(state, id, rng);
     }
 
     public static SimState Play(SimState state, int potionSimId, IReadOnlyList<int> targets, Rng rng)
     {
         var next = state.Clone();
+        if (next.Over) return next;
+        next.Rng = rng;
         next.Events.Clear();
         if (potionSimId >= 0) Potions.Apply(next, potionSimId, targets, rng);
         EndRound(next, rng);
-        if (next.Round >= Rounds) return next;
-        next.Round++;
-        next.Events.Clear();
         var total = next.TotalActivity;
         if (!next.Passed8000 && total >= FirstThreshold)
         {
             next.Passed8000 = true;
-            next.PendingInstrumentPicks++;
+            if (next.Instruments.Count + next.PendingInstrumentPicks < MaxInstruments) next.PendingInstrumentPicks++;
         }
         if (!next.Passed28000 && total >= SecondThreshold)
         {
             next.Passed28000 = true;
-            next.PendingInstrumentPicks++;
+            if (next.Instruments.Count + next.PendingInstrumentPicks < MaxInstruments) next.PendingInstrumentPicks++;
         }
+        next.Events.Clear();
+        next.Rng = null;
+        if (next.Round >= Rounds)
+        {
+            next.PendingInstrumentPicks = 0;
+            next.Over = true;
+            return next;
+        }
+        next.Round++;
         return next;
     }
 }

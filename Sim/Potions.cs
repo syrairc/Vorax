@@ -66,6 +66,7 @@ public static class Potions
     public static void Apply(SimState state, int simId, IReadOnlyList<int> targets, Rng rng)
     {
         var def = Get(simId);
+        state.Rng = rng;
         var picked = targets.Where(t => t is >= 0 and < SimState.DishCount && state.Dishes[t] is not null).Distinct().Take(def.Targeting == Targeting.OneOrTwo ? 2 : 1).ToList();
         if (def.Targeting != Targeting.None && picked.Count == 0) return;
         Handlers[simId](state, picked, rng);
@@ -81,7 +82,7 @@ public static class Potions
             var pests = BySpecies(s, Species.Pests);
             foreach (var i in pests) Boost(s, i, 11 * pests.Count);
         };
-        handlers[1] = (s, t, _) => s.Fuse(t, Species.Pests, Rarity.Normal);
+        handlers[1] = (s, t, rng) => s.Fuse(t, Species.Pests, SimState.RandomRarity(rng));
         handlers[2] = (s, t, _) =>
         {
             var m = s.Dishes[t[0]]!.Value;
@@ -300,9 +301,9 @@ public static class Potions
         {
             foreach (var i in BySpecies(s, Species.Agito))
             {
-                var m = s.Dishes[i]!.Value;
-                s.Dishes[i] = m with { Rarity = (Rarity)Math.Min((int)m.Rarity + 2, (int)Rarity.Boss), Activity = m.Activity + 120 };
-                if (m.Rarity != Rarity.Boss) s.Events.Add(new(EventKind.Awaken, i, m.Species, m.Species));
+                var rarity = s.Dishes[i]!.Value.Rarity;
+                if (rarity == Rarity.Boss) Boost(s, i, 120);
+                else s.Awaken(i, (Rarity)Math.Min((int)rarity + 2, (int)Rarity.Boss), 120);
             }
         };
         handlers[41] = (s, _, rng) =>

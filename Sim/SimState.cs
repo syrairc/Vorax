@@ -21,6 +21,8 @@ public sealed partial class SimState
     public Dictionary<int, int> AcquiredRound { get; private set; } = [];
     public List<SimEvent> Events { get; private set; } = [];
     public int PendingInstrumentPicks { get; set; }
+    public bool Over { get; set; }
+    public Rng? Rng { get; set; }
     public long TotalActivity => Dishes.Sum(d => d?.Total ?? 0L);
 
     public SimState Clone() => new()
@@ -34,5 +36,6 @@ public sealed partial class SimState
         AcquiredRound = new(AcquiredRound),
         Events = [.. Events],
         PendingInstrumentPicks = PendingInstrumentPicks,
+        Over = Over,
     };
 }
