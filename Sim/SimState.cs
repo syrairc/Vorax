@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Vorax.Sim;
 
@@ -19,7 +20,8 @@ public sealed partial class SimState
     public bool Passed28000 { get; set; }
     public Dictionary<int, int> AcquiredRound { get; private set; } = [];
     public List<SimEvent> Events { get; private set; } = [];
-    public long TotalActivity { get; set; }
+    public int PendingInstrumentPicks { get; set; }
+    public long TotalActivity => Dishes.Sum(d => d?.Total ?? 0L);
 
     public SimState Clone() => new()
     {
@@ -31,6 +33,6 @@ public sealed partial class SimState
         Passed28000 = Passed28000,
         AcquiredRound = new(AcquiredRound),
         Events = [.. Events],
-        TotalActivity = TotalActivity,
+        PendingInstrumentPicks = PendingInstrumentPicks,
     };
 }
