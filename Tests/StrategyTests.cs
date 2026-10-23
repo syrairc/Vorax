@@ -132,6 +132,55 @@ public sealed class StrategyTests
     }
 
     [Test]
+    public void PestsSkipPestAddersWhenTheBoardIsFull()
+    {
+        var offered = new[] { Potion(102), Potion(207) };
+        IsStrategyPick(Advise(Hand(offered, PestGroups(1, 2, 3, 4, 5, 6), round: 2), new PestsStrategy()), 1);
+    }
+
+    [Test]
+    public void PestsUseProbioticEnzymeAsActivityNotAsAPestAdder()
+    {
+        var offered = new[] { Potion(305), Potion(207) };
+        IsStrategyPick(Advise(Hand(offered, PestGroups(5, 5), round: 2), new PestsStrategy()), 1);
+        IsStrategyPick(Advise(Hand([Potion(305)], PestGroups(5, 5), round: 2), new PestsStrategy()), 0);
+    }
+
+    [Test]
+    public void ClawsDoNotTreatPiaMaterAsAnAwaken()
+    {
+        var offered = new[] { Potion(303), Potion(210) };
+        IsStrategyPick(Advise(Hand(offered, PestGroups(5, 5, 5), round: 10), new ClawsStrategy()), 1);
+        var advice = Advise(Hand([Potion(303)], PestGroups(5, 5, 5), round: 10), new ClawsStrategy());
+        Check.Equal(AdviceSource.SimulatorFallback, advice.Source);
+    }
+
+    [Test]
+    public void ClawsNeverRemoveTheBiggestGroupOrTheOnlyOne()
+    {
+        var board = new[] { Group(0, BoneSentry, 1, 1, 1), Group(1, BoneSentry, 1, 1, 2), Group(2, Pests, 1, 200, 50) };
+        var target = Advise(Hand([Potion(106)], board, selected: 0), new ClawsStrategy());
+        Check.Equal(AdviceSource.SimulatorFallback, target.Source);
+        var potion = Advise(Hand([Potion(106), Potion(201)], board), new ClawsStrategy());
+        Check.Equal(AdviceSource.SimulatorFallback, potion.Source);
+        var lone = Advise(Hand([Potion(105)], [Group(0, Pests, 1, 36, 1)], selected: 0), new ClawsStrategy());
+        Check.Equal(AdviceSource.SimulatorFallback, lone.Source);
+    }
+
+    [Test]
+    public void ClawsFuseOnlyLateAndCleanseOnlyWithABoneSentry()
+    {
+        var pests = PestGroups(5, 5, 5);
+        var fuse = new[] { Potion(302), Potion(106) };
+        IsStrategyPick(Advise(Hand(fuse, pests, round: 2), new ClawsStrategy()), 1);
+        IsStrategyPick(Advise(Hand(fuse, pests, round: 10), new ClawsStrategy()), 0);
+        var cleanse = new[] { Potion(307), Potion(106) };
+        IsStrategyPick(Advise(Hand(cleanse, pests, round: 2), new ClawsStrategy()), 1);
+        var withSentry = new[] { Group(0, BoneSentry, 1, 36, 1), Group(1, Pests, 1, 36, 1), Group(2, Pests, 1, 36, 9) };
+        IsStrategyPick(Advise(Hand(cleanse, withSentry, round: 2), new ClawsStrategy()), 0);
+    }
+
+    [Test]
     public void BothStrategiesHaveNamesAndDescriptions()
     {
         foreach (var (strategy, name) in new (Strategy, string)[] { (new PestsStrategy(), "Pests"), (new ClawsStrategy(), "Claws") })

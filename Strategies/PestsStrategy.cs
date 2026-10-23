@@ -7,13 +7,15 @@ namespace Vorax;
 public sealed class PestsStrategy : Strategy
 {
     static readonly int[] InstrumentPriority = [103, 211, 202, 106, 205];
-    static readonly int[] PestAdders = [102, 104, 211, 305, 403];
+    static readonly int[] PestAdders = [102, 104, 211, 403];
     static readonly int[] QuantityPotions = [207, 214, 208];
     static readonly int[] ActivityPotions = [205, 206, 301];
-    static readonly int[] PotionsThatCanLoseARarity = [207, 214, 208, 213, 216];
+    static readonly int[] PestActivityBoosters = [305];
+    static readonly int[] PotionsThatCanLoseARarity = [207, 214, 208];
 
     const int TannedLeatherRestraint = 202;
     const int EarlyRounds = 4;
+    const int PestSpecies = 201;
 
     public override string Name => "Pests";
 
@@ -24,8 +26,10 @@ public sealed class PestsStrategy : Strategy
     public override Pick? PickPotion(StrategyContext c)
     {
         if (StrategyHelpers.SimulatorWantsAKit(c)) return null;
-        var early = c.State.Round <= EarlyRounds ? Take(c, PestAdders, "adds Pest groups early") : null;
-        return early ?? Take(c, QuantityPotions, "Quantity for the most active group") ?? Take(c, ActivityPotions, "Activity for the group with most Quantity");
+        return AddPestGroup(c)
+            ?? Take(c, QuantityPotions, "Quantity for the most active group")
+            ?? Take(c, ActivityPotions, "Activity for the group with most Quantity")
+            ?? BoostPestActivity(c);
     }
 
     public override Pick? PickTarget(StrategyContext c)
@@ -35,6 +39,12 @@ public sealed class PestsStrategy : Strategy
         if (ActivityPotions.Contains(potion)) return Target(c, m => m.Count, "most Quantity gets the Activity");
         return null;
     }
+
+    static Pick? AddPestGroup(StrategyContext c) =>
+        c.State.Round <= EarlyRounds && c.State.Monsters.Length < c.State.MonsterSlots ? Take(c, PestAdders, "adds Pest groups early") : null;
+
+    static Pick? BoostPestActivity(StrategyContext c) =>
+        c.State.Monsters.Any(m => m.Species == PestSpecies) ? Take(c, PestActivityBoosters, "Activity for every Pest group") : null;
 
     static Pick? Take(StrategyContext c, int[] potions, string reason)
     {

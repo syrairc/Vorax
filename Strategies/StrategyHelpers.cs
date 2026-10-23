@@ -6,7 +6,7 @@ namespace Vorax;
 
 public static class StrategyHelpers
 {
-    public static int FirstOffered(StrategyContext c, int[] priority)
+    static int FirstOffered(StrategyContext c, int[] priority)
     {
         foreach (var id in priority)
         {
