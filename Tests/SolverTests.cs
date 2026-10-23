@@ -192,6 +192,51 @@ public sealed class SolverTests
         Check.Equal(before, (board.TotalActivity, board.Round, board.Rerolls, board.Instruments.Count, board.Events.Count));
     }
 
+    [Test]
+    public void NearEqualOptionsDoNotRecommendAReroll()
+    {
+        var settings = new SolveSettings(200, 1500, 0.05) { RealWeights = new Dictionary<int, int> { [17] = 1, [18] = 1 } };
+        for (ulong seed = 1; seed <= 6; seed++)
+        {
+            var board = Board(new Monster(Species.Pests, Rarity.Rare, 15, 12), Normal(Species.Pests, 4), Normal(Species.Agito));
+            board.Round = 3;
+            var ranking = Solver.RankPotions(board, [17, 18, 17], settings, null, true, new Rng(seed));
+            Check.That(!ranking.RerollBest, $"seed {seed}: reroll {ranking.RerollValue} vs {ranking.Values[ranking.Best]}");
+        }
+    }
+
+    [Test]
+    public void NegativeScoresUseASignSafeMargin()
+    {
+        var board = Board(Normal(Species.Pests), Normal(Species.Agito));
+        var ranking = Solver.RankPotions(board, [17, 17, 17], Quick, s => -s.TotalActivity, true, new Rng(21));
+        Check.That(!ranking.RerollBest || ranking.RerollValue > ranking.Values[ranking.Best] + System.Math.Abs(ranking.Values[ranking.Best]) * 0.05);
+    }
+
+    [Test]
+    public void KitWeightsOnlyYieldTheirRarity()
+    {
+        var pool = DrawModel.PotionPool(null);
+        var rare = DrawModel.KitPool(new KitDef(3, [0, 0, 100, 0]), pool);
+        Check.That(rare.Count > 0 && rare.All(p => p.SimId is >= 0 and <= 6));
+        var mixed = DrawModel.KitPool(new KitDef(3, [40, 44, 15, 1]), pool);
+        Check.That(System.Math.Abs(mixed.Where(p => p.SimId is >= 23 and <= 32).Sum(p => p.Weight) - 40) < 1e-9);
+        Check.That(System.Math.Abs(mixed.Where(p => p.SimId is >= 35).Sum(p => p.Weight) - 1) < 1e-9);
+        var rng = new Rng(3);
+        for (var n = 0; n < 50; n++) Check.That(DrawModel.Draw(rare, 3, rng).All(id => id is >= 0 and <= 6));
+    }
+
+    [Test]
+    public void GameRarityBandsMatchTheSimRarityClasses()
+    {
+        foreach (var (low, high, rarity) in new[] { (101, 110, 0), (201, 216, 1), (301, 307, 2), (401, 406, 3) })
+            for (var id = low; id <= high; id++)
+            {
+                Check.That(GameIds.TryPotion(id, out var sim), $"game {id}");
+                Check.Equal(rarity, DrawModel.RarityClass(sim));
+            }
+    }
+
     static SimState Board(params Monster[] monsters)
     {
         var s = new SimState { Round = 1, Rerolls = 3 };

@@ -19,6 +19,8 @@ public static class Solver
     const int PotionRounds = 10;
     const int HandSize = 3;
     const int HandSamples = 5;
+    const int FreshSamples = 16;
+    const int MinRerollHands = 8;
     const int FirstAdvancedInstrument = 9;
     const int LastInstrument = 25;
 
@@ -39,8 +41,9 @@ public static class Solver
         var best = BestIndex(values);
         var reroll = 0.0;
         var canReroll = allowReroll && state.Rerolls > 0;
-        if (canReroll) reroll = run.RerollValue(state, Math.Max(HandSize, potionSimIds.Count));
-        return new(values, best, reroll, canReroll && best >= 0 && reroll > values[best] * (1 + settings.RerollMargin));
+        var enoughHands = false;
+        if (canReroll) (reroll, enoughHands) = run.RerollValue(state, Math.Max(HandSize, potionSimIds.Count));
+        return new(values, best, reroll, canReroll && enoughHands && best >= 0 && reroll > values[best] + Math.Abs(values[best]) * settings.RerollMargin);
     }
 
     public static Ranking RankInstruments(SimState state, IReadOnlyList<int> instrumentSimIds, SolveSettings settings, Func<SimState, double>? score, Rng rng)
@@ -179,40 +182,48 @@ public static class Solver
             return Score(copy);
         }
 
-        double BestOfHand(SimState s, IReadOnlyList<int> hand, int samples)
+        // pick the winner with a cheap pass, then value it with fresh samples so the max over noisy means does not bias the result up
+        double BestOfHand(SimState s, IReadOnlyList<int> hand)
         {
             if (hand.Count == 0) return 0;
-            var best = double.NegativeInfinity;
+            var winner = hand[0];
+            var winnerTargets = ChooseTargets(s, winner);
+            var bestCheap = double.NegativeInfinity;
             foreach (var potion in hand)
             {
                 var targets = ChooseTargets(s, potion);
                 var sum = 0.0;
-                for (var k = 0; k < samples; k++) sum += PlayThenFinish(s, potion, targets);
-                best = Math.Max(best, sum / samples);
+                for (var k = 0; k < HandSamples; k++) sum += PlayThenFinish(s, potion, targets);
+                if (sum <= bestCheap) continue;
+                (bestCheap, winner, winnerTargets) = (sum, potion, targets);
             }
-            return best;
+            var fresh = 0.0;
+            for (var k = 0; k < FreshSamples; k++) fresh += PlayThenFinish(s, winner, winnerTargets);
+            return fresh / FreshSamples;
         }
 
-        public double KitValue(SimState s, KitDef kit) => MeanOverHands(s, DrawModel.KitPool(kit, _pool), kit.Amount, Math.Max(4, settings.Rollouts / 10), 0.65);
+        public double KitValue(SimState s, KitDef kit) => MeanOverHands(s, DrawModel.KitPool(kit, _pool), kit.Amount, Math.Max(4, settings.Rollouts / 10), 0.65).Mean;
 
-        public double RerollValue(SimState s, int handSize)
+        public (double Value, bool EnoughHands) RerollValue(SimState s, int handSize)
         {
             var after = s.Clone();
             after.Rerolls--;
-            return MeanOverHands(after, _pool, handSize, Math.Max(4, settings.Rollouts / 5), 1.0);
+            var planned = Math.Max(4, settings.Rollouts / 5);
+            var (mean, hands) = MeanOverHands(after, _pool, handSize, planned, 1.0);
+            return (mean, hands >= Math.Min(MinRerollHands, planned));
         }
 
-        double MeanOverHands(SimState s, IReadOnlyList<(int SimId, double Weight)> pool, int handSize, int hands, double budgetFraction)
+        (double Mean, int Hands) MeanOverHands(SimState s, IReadOnlyList<(int SimId, double Weight)> pool, int handSize, int hands, double budgetFraction)
         {
             var sum = 0.0;
             var done = 0;
             while (done < hands)
             {
-                sum += BestOfHand(s, DrawModel.Draw(pool, handSize, rng), HandSamples);
+                sum += BestOfHand(s, DrawModel.Draw(pool, handSize, rng));
                 done++;
                 if (Past(budgetFraction)) break;
             }
-            return sum / done;
+            return (sum / done, done);
         }
     }
 }
