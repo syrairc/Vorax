@@ -114,16 +114,17 @@ public sealed class SolverTests
     }
 
     [Test]
-    public void OneOrTwoTargetPotionRanksPairs()
+    public void OneOrTwoTargetPotionRanksSinglesAndPairs()
     {
         var board = Board(Normal(Species.Pests), Normal(Species.Pests, 3), Normal(Species.Pests, 5));
         var options = Solver.TargetOptions(board, 1);
-        Check.Equal(3, options.Count);
-        Check.That(options.All(o => o.Length == 2));
+        Check.Equal(6, options.Count);
+        Check.Equal(3, options.Count(o => o.Length == 1));
+        Check.Equal(3, options.Count(o => o.Length == 2));
         var ranking = Solver.RankTargets(board, 1, Quick, null, new Rng(11));
-        Check.Equal(3, ranking.Values.Length);
-        Check.That(ranking.Best is >= 0 and < 3);
-        Check.Equal(2, Solver.BestTargets(board, 1, Quick, null, new Rng(11)).Count);
+        Check.Equal(6, ranking.Values.Length);
+        Check.That(ranking.Best is >= 0 and < 6);
+        Check.That(Solver.BestTargets(board, 1, Quick, null, new Rng(11)).Count is 1 or 2);
     }
 
     [Test]

@@ -68,9 +68,9 @@ public static class Solver
         var occupied = Enumerable.Range(0, SimState.DishCount).Where(i => state.Dishes[i] is not null).ToList();
         var targeting = Potions.Get(potionSimId).Targeting;
         if (targeting == Targeting.None) return [[]];
-        if (targeting == Targeting.OneOrTwo && occupied.Count >= 2)
-            return [.. occupied.SelectMany((a, ai) => occupied.Skip(ai + 1).Select(b => new[] { a, b }))];
-        return [.. occupied.Select(i => new[] { i })];
+        var singles = occupied.Select(i => new[] { i });
+        if (targeting != Targeting.OneOrTwo) return [.. singles];
+        return [.. singles, .. occupied.SelectMany((a, ai) => occupied.Skip(ai + 1).Select(b => new[] { a, b }))];
     }
 
     public static Ranking RankTargets(SimState state, int potionSimId, SolveSettings settings, Func<SimState, double>? score, Rng rng)

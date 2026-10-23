@@ -35,7 +35,7 @@ public sealed class Engine(SolveSettings settings, Rng rng)
         if (strategy is not null)
         {
             var maxTargets = stage == Stage.Target ? (int)SelectedTargeting(state) : 0;
-            VoraxCard? chosen = stage == Stage.Target ? state.Offered[state.SelectedCard] : null;
+            VoraxCard? chosen = stage == Stage.Target ? state.Offered[SelectedIndex(state)] : null;
             var context = new StrategyContext(state, stage, chosen, maxTargets, (score, allowReroll) => rank(score, allowReroll).Pick);
             try
             {
@@ -49,16 +49,26 @@ public sealed class Engine(SolveSettings settings, Rng rng)
             }
         }
 
-        var best = rank(null, true);
-        return new(stage, strategy is null ? AdviceSource.Simulator : AdviceSource.SimulatorFallback, name, best.Pick, best.Values, best.RerollValue, error);
+        try
+        {
+            var best = rank(null, true);
+            return new(stage, strategy is null ? AdviceSource.Simulator : AdviceSource.SimulatorFallback, name, best.Pick, best.Values, best.RerollValue, error);
+        }
+        catch (Exception e)
+        {
+            return Failed(stage, name, $"simulator threw {e.GetType().Name}: {e.Message}");
+        }
     }
 
     static Advice Failed(Stage stage, string name, string? error) => new(stage, AdviceSource.Simulator, name, NoPick, null, null, error);
 
+    static int SelectedIndex(VoraxState state) => state.SelectedCard < 0 ? -1 : Array.FindIndex(state.Offered, c => c.Slot == state.SelectedCard);
+
     static Targeting SelectedTargeting(VoraxState state)
     {
-        if (state.SelectedCard < 0 || state.SelectedCard >= state.Offered.Length) return Targeting.None;
-        var card = state.Offered[state.SelectedCard];
+        var selected = SelectedIndex(state);
+        if (selected < 0) return Targeting.None;
+        var card = state.Offered[selected];
         return card.Kind != VoraxCardKind.Bundle && GameIds.TryPotion(card.Id, out var simId) ? Potions.Get(simId).Targeting : Targeting.None;
     }
 
@@ -125,7 +135,7 @@ public sealed class Engine(SolveSettings settings, Rng rng)
             };
         }
 
-        GameIds.TryPotion(state.Offered[state.SelectedCard].Id, out var targetedPotion);
+        GameIds.TryPotion(state.Offered[SelectedIndex(state)].Id, out var targetedPotion);
         return (score, _) =>
         {
             var r = Solver.RankTargets(sim, targetedPotion, settings, score, rng);

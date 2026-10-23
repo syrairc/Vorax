@@ -29,7 +29,7 @@ public sealed class EngineTests
     static VoraxCard InstrumentCard(int id) => new(0, id, VoraxCardKind.Instrument, 0);
 
     static VoraxState Hand(VoraxCard[] offered, VoraxMonster[]? monsters = null, int rerolls = 3, int selected = -1, VoraxPhase phase = VoraxPhase.Round) =>
-        new(phase, 1, 13, 100, 0, 0, 0, rerolls, 6, monsters ?? [], offered, [], []) { SelectedCard = selected };
+        new(phase, 1, 13, 100, 0, 0, 0, rerolls, 6, monsters ?? [], [.. offered.Select((c, i) => c with { Slot = i })], [], []) { SelectedCard = selected };
 
     static VoraxMonster[] PestGroups(params int[] activities) => [.. activities.Select((a, i) => Group(i, 201, 1, 36, a))];
 
@@ -51,6 +51,13 @@ public sealed class EngineTests
     public sealed class AlphaTestStrategy : Strategy
     {
         public override string Name => "Alpha test";
+    }
+
+    public sealed class ThrowingTestStrategy : Strategy
+    {
+        public ThrowingTestStrategy() => throw new InvalidOperationException("no");
+
+        public override string Name => "Throwing test";
     }
 
     public sealed class BetaTestStrategy : Strategy
@@ -162,7 +169,6 @@ public sealed class EngineTests
         Check.Equal(AdviceSource.SimulatorFallback, three.Source);
         var twin = NewEngine().Advise(Hand([Potion(MoltingSkin)], board, selected: 0), new Scripted(target: _ => new Pick([1, 1], "same")), default)!;
         Check.Equal(AdviceSource.SimulatorFallback, twin.Source);
-        Check.Equal(2, three.Pick.Indexes.Length);
     }
 
     [Test]
@@ -349,12 +355,33 @@ public sealed class EngineTests
     [Test]
     public void RegistryFindsTheExampleStrategiesByName()
     {
-        Check.That(Registry.ByName("Alpha test") is AlphaTestStrategy);
-        Check.That(Registry.ByName("Beta test") is BetaTestStrategy { Description: "second" });
-        var names = Registry.All().Select(s => s.Name).ToList();
+        var found = Registry.Discover(true);
+        Check.That(found.Any(s => s is AlphaTestStrategy));
+        Check.That(found.Any(s => s is BetaTestStrategy { Description: "second" }));
+        var names = found.Select(s => s.Name).ToList();
         Check.That(names.IndexOf("Alpha test") >= 0 && names.IndexOf("Alpha test") < names.IndexOf("Beta test"));
         Check.That(names.SequenceEqual(names.OrderBy(n => n, StringComparer.Ordinal)));
-        Check.That(Registry.All().All(s => s.GetType() != typeof(Scripted)));
+        Check.That(found.All(s => s.GetType() != typeof(Scripted)));
+    }
+
+    [Test]
+    public void RegistryHidesNestedStrategiesAndSurvivesAThrowingOne()
+    {
+        Check.That(!Registry.All().Any(s => s is AlphaTestStrategy or BetaTestStrategy));
+        Check.That(Registry.ByName("Alpha test") is null);
+        Check.That(!Registry.Discover(true).Any(s => s is ThrowingTestStrategy));
+    }
+
+    [Test]
+    public void SelectedCardIsMatchedBySlotNotArrayPosition()
+    {
+        var offered = new[] { new VoraxCard(5, Spawning, VoraxCardKind.Potion, 1), new VoraxCard(7, Xenopurge, VoraxCardKind.Potion, 1) };
+        var state = new VoraxState(VoraxPhase.Round, 1, 13, 100, 0, 0, 0, 3, 6, PestGroups(2, 90), offered, [], []) { SelectedCard = 7 };
+        var engine = NewEngine();
+        Check.Equal(Stage.Target, engine.DetectStage(state));
+        Check.Equal(Stage.Potion, engine.DetectStage(state with { SelectedCard = 1 }));
+        var advice = engine.Advise(state, new Scripted(target: c => Pick.One(1, c.Chosen!.Value.Id.ToString())), default)!;
+        Check.Equal("207", advice.Pick.Reason);
     }
 
     [Test]
