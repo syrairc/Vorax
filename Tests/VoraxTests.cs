@@ -2,6 +2,7 @@ using System.Linq;
 using EmberHUD;
 using EmberHUD.Testing;
 using EmberHUD.Ui;
+using Vorax.Sim;
 
 namespace Vorax;
 
@@ -29,12 +30,12 @@ public sealed class VoraxTests
         RewardBonusPercent = 20,
     };
 
-    static int Frame(VoraxState? state, Settings? settings = null)
+    static int Frame(VoraxState? state, Settings? settings = null, Advice? advice = null)
     {
         TestGame.Set(new GameState { Vorax = state });
         try
         {
-            var plugin = new Main();
+            var plugin = new Main { AdviceOverride = advice };
             if (settings is not null) typeof(Plugin<Settings>).GetProperty("Settings")!.GetSetMethod(true)!.Invoke(plugin, [settings]);
             return TestFrame.Vertices(plugin.Render);
         }
@@ -62,5 +63,81 @@ public sealed class VoraxTests
         Check.That(rows.Any(r => r.Left.Contains("Aberrant Sprout")), "instrument");
         Check.That(rows.Any(r => r.Left.Contains("Spinal Cord Stimulation") && r.Right == "Modifier / Surgical Protocol"), "protocol");
         Check.That(rows.Any(r => r.Left == "Reward bonus" && r.Right == "+20%"), "reward bonus");
+    }
+
+    static Advice Potion(AdviceSource source = AdviceSource.Simulator, string error = "") => new(Stage.Potion, source, "Pests", Pick.One(0, "simulated 12"), [12, 8], 6, error == "" ? null : error);
+
+    static VoraxState WithRects() => Sample() with { Offered = [Sample().Offered[0] with { Min = new(100, 400), Max = new(300, 900) }] };
+
+    [Test]
+    public void RenderDrawsHighlightsForAnAdvice()
+    {
+        var advice = Potion();
+        Check.That(Frame(WithRects(), new Settings { ShowPanel = false }, advice) > 0, "marks drew without the panel");
+        Check.Equal(0, Frame(WithRects(), new Settings { ShowPanel = false, ShowHighlights = false }, advice));
+        Check.That(Frame(WithRects(), new Settings(), advice) > Frame(WithRects(), new Settings { ShowHighlights = false }, advice), "marks add vertices");
+    }
+
+    [Test]
+    public void ModeSettingPicksTheStrategyByName()
+    {
+        var first = Registry.All()[0];
+        var main = new Main();
+        Check.That(ReferenceEquals(first, main.StrategyFor(first.Name)), "same instance by name");
+        Check.That(ReferenceEquals(main.StrategyFor(first.Name), main.StrategyFor(first.Name)), "stable");
+    }
+
+    [Test]
+    public void UnknownModeUsesTheSimulator()
+    {
+        var main = new Main();
+        Check.That(main.StrategyFor("Simulator") is null, "Simulator");
+        Check.That(main.StrategyFor("No such strategy") is null, "unknown");
+        Check.That(main.StrategyFor("") is null, "empty");
+    }
+
+    [Test]
+    public void SourceLabelsNameTheStrategyOrTheFallback()
+    {
+        Check.Equal("Simulator", Main.SourceLabel(Potion()));
+        Check.Equal("Strategy: Pests", Main.SourceLabel(Potion(AdviceSource.Strategy)));
+        Check.Equal("Simulator (fallback: no rule)", Main.SourceLabel(Potion(AdviceSource.SimulatorFallback, "no rule")));
+    }
+
+    [Test]
+    public void AdviceRowsShowPickValuesRerollAndError()
+    {
+        var rows = Main.AdviceRows(Sample(), Potion(error: "bad read"));
+        Check.That(rows.Any(r => r.Left == "Stage" && r.Right == "Potion"), "stage");
+        Check.That(rows.Any(r => r.Left == "Source" && r.Right == "Simulator"), "source");
+        Check.That(rows.Any(r => r.Left.Contains("Eggshell Powder") && r.Right == "simulated 12"), "pick");
+        Check.That(rows.Any(r => r.Left.Contains("Eggshell Powder") && r.Right == "12"), "value");
+        Check.That(rows.Any(r => r.Left == "Reroll" && r.Right == "6"), "reroll value");
+        Check.That(rows.Any(r => r.Left == "Error" && r.Right == "bad read"), "error");
+    }
+
+    [Test]
+    public void NoAdviceYetSaysThinking()
+    {
+        var rows = Main.AdviceRows(Sample(), null);
+        Check.That(rows.Any(r => r.Right == "thinking..."), "thinking");
+        Check.Equal(0, Main.AdviceRows(Sample() with { Offered = [] }, null).Count);
+    }
+
+    [Test]
+    public void DebugRowsStayBehindTheDebugSetting()
+    {
+        var plain = new Main().PanelRows(Sample(), Potion());
+        var withDebug = new Main();
+        typeof(Plugin<Settings>).GetProperty("Settings")!.GetSetMethod(true)!.Invoke(withDebug, [new Settings { Debug = true }]);
+        var debug = withDebug.PanelRows(Sample(), Potion());
+        Check.That(debug.Count > plain.Count && debug.Any(r => r.Left == "Phase"), "debug adds rows");
+    }
+
+    [Test]
+    public void RolloutsClampToTheNoiseFloor()
+    {
+        Check.Equal(200, new Settings { Rollouts = 50 }.ClampedRollouts);
+        Check.Equal(400, new Settings { Rollouts = 400 }.ClampedRollouts);
     }
 }
