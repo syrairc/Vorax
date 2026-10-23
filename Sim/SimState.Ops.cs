@@ -5,7 +5,7 @@ namespace Vorax.Sim;
 
 public sealed partial class SimState
 {
-    static readonly Species[] AllSpecies = [Species.Pests, Species.BoneSentry, Species.Agito, Species.Aemberon];
+    internal static readonly Species[] AllSpecies = [Species.Pests, Species.BoneSentry, Species.Agito, Species.Aemberon];
     static readonly (Rarity Rarity, int Weight)[] RarityWeights = [(Rarity.Normal, 30), (Rarity.Magic, 40), (Rarity.Rare, 20), (Rarity.Boss, 10)];
 
     public int Add(Monster m)
@@ -74,7 +74,7 @@ public sealed partial class SimState
         Events.Add(new(EventKind.Devour, eater, e.Species, p.Species));
     }
 
-    static Rarity RandomRarity(Rng rng)
+    internal static Rarity RandomRarity(Rng rng)
     {
         var roll = rng.NextDouble() * 100;
         var cumulative = 0;
