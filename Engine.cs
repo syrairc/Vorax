@@ -14,11 +14,13 @@ public sealed class Engine(SolveSettings settings, Rng rng)
 
     static readonly Pick NoPick = new([], "");
 
+    readonly HashSet<string> logged = [];
+
     public Stage DetectStage(VoraxState state)
     {
         if (state.Offered.Length == 0) return Stage.None;
-        if (state.Phase == VoraxPhase.Instrument) return Stage.Instrument;
-        if (state.Phase != VoraxPhase.Round) return Stage.None;
+        if (state.Phase == VoraxPhase.Instrument) return state.Offered.All(c => c.Kind == VoraxCardKind.Instrument) ? Stage.Instrument : Stage.None;
+        if (state.Phase != VoraxPhase.Round || !state.Offered.All(c => c.Kind is VoraxCardKind.Potion or VoraxCardKind.Bundle)) return Stage.None;
         return SelectedTargeting(state) == Targeting.None ? Stage.Potion : Stage.Target;
     }
 
@@ -28,9 +30,9 @@ public sealed class Engine(SolveSettings settings, Rng rng)
         if (stage == Stage.None) return null;
         var name = strategy?.Name ?? "";
         var mapped = StateMapper.Map(state, options);
-        if (mapped.State is not { } sim) return Failed(stage, name, mapped.Error);
+        if (mapped.State is not { } sim) return Failed(stage, name, LogOnce(mapped.Error));
         var rank = BuildRanker(state, stage, sim, out var error);
-        if (rank is null) return Failed(stage, name, error);
+        if (rank is null) return Failed(stage, name, LogOnce(error));
 
         if (strategy is not null)
         {
@@ -58,6 +60,14 @@ public sealed class Engine(SolveSettings settings, Rng rng)
         {
             return Failed(stage, name, $"simulator threw {e.GetType().Name}: {e.Message}");
         }
+    }
+
+    string? LogOnce(string? error)
+    {
+        bool isNew;
+        lock (logged) isNew = error is not null && logged.Add(error);
+        if (isNew) Log.Warn($"Vorax: {error}");
+        return error;
     }
 
     static Advice Failed(Stage stage, string name, string? error) => new(stage, AdviceSource.Simulator, name, NoPick, null, null, error);

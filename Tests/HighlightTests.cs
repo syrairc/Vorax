@@ -92,4 +92,15 @@ public sealed class HighlightTests
         var settings = new Settings();
         Check.That(settings.StrategyColour != settings.SimulatorColour, "default colours differ");
     }
+
+    [Test]
+    public void TheFrameLabelNamesTheSourceAndThePick()
+    {
+        var sim = Highlight.Marks(State(VoraxPhase.Round), Advise(Stage.Potion, Pick.One(0, "long reason")), Buttons);
+        Check.Equal("Simulator - card0", sim[0].Label);
+        var strategy = new Advice(Stage.Potion, AdviceSource.Strategy, "Pests", Pick.One(1, "r"), null, null, null);
+        Check.Equal("Strategy: Pests - card1", Highlight.Marks(State(VoraxPhase.Round), strategy, Buttons)[0].Label);
+        var target = new Advice(Stage.Target, AdviceSource.Strategy, "Pests", Pick.One(1, "r"), null, null, null);
+        Check.Equal("Strategy: Pests - Fly", Highlight.Marks(State(VoraxPhase.Round, 0), target, Buttons)[0].Label);
+    }
 }

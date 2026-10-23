@@ -56,7 +56,7 @@ public sealed class WorkerTests
         Check.That(worker.Latest is null);
         var gate = new ManualResetEventSlim();
         var entered = new ManualResetEventSlim();
-        worker.Submit(Hand(), new Probe("A", gate, entered));
+        worker.Submit(Hand(), new Probe("A", gate, entered), default);
         Check.That(entered.Wait(Bound));
         Check.That(worker.Latest is null);
         gate.Set();
@@ -71,13 +71,13 @@ public sealed class WorkerTests
         var entered = new ManualResetEventSlim();
         var probe = new Probe("A", gate, entered);
         var state = Hand();
-        worker.Submit(state, probe);
+        worker.Submit(state, probe, default);
         Check.That(entered.Wait(Bound));
-        worker.Submit(Hand(), probe);
-        worker.Submit(Hand(activity: 5000), probe);
+        worker.Submit(Hand(), probe, default);
+        worker.Submit(Hand(activity: 5000), probe, default);
         gate.Set();
         WaitFor(() => worker.Latest is not null);
-        worker.Submit(Hand(), probe);
+        worker.Submit(Hand(), probe, default);
         Check.That(worker.Latest is not null, "same key must not clear the result");
         Check.Equal(1, probe.Calls);
         Check.That(worker.Matches(state));
@@ -91,9 +91,9 @@ public sealed class WorkerTests
         var entered = new ManualResetEventSlim();
         var stateA = Hand(round: 1);
         var stateB = Hand(round: 2);
-        worker.Submit(stateA, new Probe("A", gate, entered));
+        worker.Submit(stateA, new Probe("A", gate, entered), default);
         Check.That(entered.Wait(Bound));
-        worker.Submit(stateB, new Probe("B"));
+        worker.Submit(stateB, new Probe("B"), default);
         gate.Set();
         WaitFor(() => worker.Latest is not null);
         Check.Equal("B", worker.Latest!.StrategyName);
@@ -105,11 +105,11 @@ public sealed class WorkerTests
     public void AStaleResultNeverMatchesTheCurrentState()
     {
         using var worker = NewWorker();
-        worker.Submit(Hand(round: 1), new Probe("A"));
+        worker.Submit(Hand(round: 1), new Probe("A"), default);
         WaitFor(() => worker.Latest is not null);
         var gate = new ManualResetEventSlim();
         var entered = new ManualResetEventSlim();
-        worker.Submit(Hand(round: 2), new Probe("B", gate, entered));
+        worker.Submit(Hand(round: 2), new Probe("B", gate, entered), default);
         Check.That(worker.Latest is null);
         Check.That(!worker.Matches(Hand(round: 1)));
         Check.That(!worker.Matches(Hand(round: 2)));
@@ -120,11 +120,11 @@ public sealed class WorkerTests
     public void AThrowingEvaluationDoesNotKillTheThread()
     {
         using var worker = NewWorker();
-        worker.Submit(Hand(round: 1), new NameThrows());
+        worker.Submit(Hand(round: 1), new NameThrows(), default);
         WaitFor(() => worker.Latest is not null);
         Check.That(worker.Latest!.Error is not null);
         Check.Equal(0, worker.Latest.Pick.Indexes.Length);
-        worker.Submit(Hand(round: 2), new Probe("B"));
+        worker.Submit(Hand(round: 2), new Probe("B"), default);
         WaitFor(() => worker.Latest is { Error: null });
         Check.Equal("B", worker.Latest!.StrategyName);
     }
@@ -133,13 +133,13 @@ public sealed class WorkerTests
     public void DisposeStopsTheThread()
     {
         var worker = NewWorker();
-        worker.Submit(Hand(), new Probe("A"));
+        worker.Submit(Hand(), new Probe("A"), default);
         WaitFor(() => worker.Latest is not null);
         Check.That(worker.ThreadAlive);
         worker.Dispose();
         Check.That(!worker.ThreadAlive);
         var probe = new Probe("late");
-        worker.Submit(Hand(round: 2), probe);
+        worker.Submit(Hand(round: 2), probe, default);
         Check.Equal(0, probe.Calls);
         worker.Dispose();
     }
@@ -174,10 +174,71 @@ public sealed class WorkerTests
         var options = tracker.Update(Hand(round: 1, activity: 100));
         Check.That(!options.Passed8000 && !options.Passed28000);
         Check.That(options.AcquiredRounds is null or { Count: 0 });
+    }
 
-        tracker.Update(Hand(round: 3, activity: 9000));
-        options = tracker.Update(Hand(round: 4, activity: 50));
-        Check.That(!options.Passed8000, "activity below the run start is a new run");
+    [Test]
+    public void AnActivityDipDoesNotStartANewRun()
+    {
+        var tracker = new RunTracker();
+        tracker.Update(Hand(round: 6, activity: 9000, instruments: [101]));
+        var options = tracker.Update(Hand(round: 7, activity: 50, instruments: [101]));
+        Check.That(options.Passed8000);
+        Check.Equal(6, options.AcquiredRounds![101]);
+    }
+
+    [Test]
+    public void OwnedRelicsImplyThePassedThresholds()
+    {
+        var tracker = new RunTracker();
+        var one = tracker.Update(Hand(round: 6, activity: 50, instruments: [101, 216]));
+        Check.That(one.Passed8000 && !one.Passed28000);
+        var two = new RunTracker().Update(Hand(round: 9, activity: 50, instruments: [216, 217]));
+        Check.That(two.Passed8000 && two.Passed28000);
+        Check.That(!new RunTracker().Update(Hand(round: 9, activity: 50, instruments: [101, 102])).Passed8000);
+    }
+
+    static VoraxState Pickable(int selected = -1, int[]? monsters = null) =>
+        new(VoraxPhase.Round, 3, 13, 100, 0, 0, 0, 3, 6, [new(0, 1, 203, 1, 36, 1)], [new(0, 305, VoraxCardKind.Potion, 1), new(1, 302, VoraxCardKind.Potion, 1), new(2, 204, VoraxCardKind.Potion, 1)], [], [])
+        { SelectedCard = selected, SelectedMonsters = monsters ?? [] };
+
+    [Test]
+    public void ClickingTheAdvisedNonTargetingCardDoesNotRecompute()
+    {
+        using var worker = NewWorker();
+        var probe = new Probe("A");
+        worker.Submit(Pickable(), probe, default);
+        WaitFor(() => worker.Latest is not null);
+        worker.Submit(Pickable(selected: 0), probe, default);
+        Check.That(worker.Latest is not null);
+        Check.That(worker.Matches(Pickable(selected: 0)));
+        Check.Equal(1, probe.Calls);
+    }
+
+    [Test]
+    public void SelectingATargetingCardMovesToTheTargetStageOnce()
+    {
+        using var worker = NewWorker();
+        var probe = new Probe("A");
+        worker.Submit(Pickable(), probe, default);
+        WaitFor(() => worker.Latest is not null);
+        Check.Equal(Stage.Potion, worker.Latest!.Stage);
+        worker.Submit(Pickable(selected: 1), probe, default);
+        WaitFor(() => worker.Latest is { Stage: Stage.Target });
+        worker.Submit(Pickable(selected: 1), probe, default);
+        Check.That(worker.Latest is { Stage: Stage.Target });
+    }
+
+    [Test]
+    public void SelectingThePickedCylinderDoesNotRecompute()
+    {
+        using var worker = NewWorker();
+        var probe = new Probe("A");
+        worker.Submit(Pickable(selected: 1), probe, default);
+        WaitFor(() => worker.Latest is not null);
+        var advice = worker.Latest;
+        worker.Submit(Pickable(selected: 1, monsters: [0]), probe, default);
+        Check.That(ReferenceEquals(advice, worker.Latest));
+        Check.That(worker.Matches(Pickable(selected: 1, monsters: [0])));
     }
 
     [Test]

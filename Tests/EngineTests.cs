@@ -391,4 +391,17 @@ public sealed class EngineTests
         Check.That(Registry.ByName(null) is null);
         Check.That(Registry.ByName("") is null);
     }
+
+    [Test]
+    public void AStaleHandOfTheOtherKindShowsNothing()
+    {
+        var engine = NewEngine();
+        var instruments = Hand([InstrumentCard(209), InstrumentCard(201)], XenopurgeBoard());
+        Check.Equal(Stage.None, engine.DetectStage(instruments));
+        Check.That(engine.Advise(instruments, null, default) is null);
+        var potionsInInstrumentPhase = Hand([Potion(Xenopurge), Potion(204)], XenopurgeBoard(), phase: VoraxPhase.Instrument);
+        Check.Equal(Stage.None, engine.DetectStage(potionsInInstrumentPhase));
+        Check.Equal(Stage.Instrument, engine.DetectStage(Hand([InstrumentCard(209), InstrumentCard(201)], phase: VoraxPhase.Instrument)));
+        Check.Equal(Stage.None, engine.DetectStage(Hand([Potion(Xenopurge), InstrumentCard(201)], XenopurgeBoard())));
+    }
 }

@@ -19,6 +19,7 @@ public sealed class Main : Plugin<Settings>
     readonly Overlay _overlay = new();
     int _unusedWidth, _unusedHeight;
     readonly Calibration _calibration = new(Log.Info);
+    readonly RunTracker _tracker = new();
     Worker? _worker;
     (int, int, int) _workerKey;
 
@@ -40,7 +41,7 @@ public sealed class Main : Plugin<Settings>
             _worker = new(new Engine(new(key.Item1, key.Item2, key.Item3 / 100.0), new Rng((ulong)Environment.TickCount64)));
         }
 
-        _worker.Submit(state, StrategyFor(Settings.Mode));
+        _worker.Submit(state, StrategyFor(Settings.Mode), _tracker.Update(state));
         if (Settings.Debug) _calibration.Observe(state);
     }
 

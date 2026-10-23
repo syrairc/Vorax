@@ -20,7 +20,7 @@ public sealed class Calibration(Action<string> log)
     MapOptions startOptions;
     VoraxCard? card;
     int[] targets = [];
-    bool sawKit;
+    string? kitSkip;
     bool sawInstrument;
 
     public void Observe(VoraxState state)
@@ -48,7 +48,8 @@ public sealed class Calibration(Action<string> log)
         startOptions = options;
         card = null;
         targets = [];
-        sawKit = sawInstrument = false;
+        kitSkip = null;
+        sawInstrument = false;
         Track(state);
     }
 
@@ -57,7 +58,7 @@ public sealed class Calibration(Action<string> log)
         var index = Array.FindIndex(state.Offered, c => c.Slot == state.SelectedCard);
         if (state.SelectedCard < 0 || index < 0) return;
         var selected = state.Offered[index];
-        if (selected.Kind == VoraxCardKind.Bundle) sawKit = true;
+        if (selected.Kind == VoraxCardKind.Bundle) kitSkip = GameIds.TryKit(selected.Id, out _) ? "potion kit" : "monster kit";
         else (card, targets) = (selected, state.SelectedMonsters);
     }
 
@@ -67,7 +68,7 @@ public sealed class Calibration(Action<string> log)
         void Say(string text) => log($"Vorax calibration round {round}: {text}");
         if (next.Round != round + 1) Say($"skipped, round jumped to {next.Round}");
         else if (sawInstrument) Say("skipped, instrument pick");
-        else if (sawKit) Say("skipped, monster kit");
+        else if (kitSkip is not null) Say($"skipped, {kitSkip}");
         else if (card is not { } picked) Say("skipped, no potion pick seen");
         else if (!GameIds.TryPotion(picked.Id, out var potion)) Say($"skipped, potion id {picked.Id}");
         else

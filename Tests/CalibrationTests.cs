@@ -72,7 +72,16 @@ public sealed class CalibrationTests
         calibration.Observe(Round(3, [Group(0, 201)], [Potion(Probiotic)], 0));
         calibration.Observe(Round(4, [Group(0, 201, 36, 12)]));
         Check.Equal(1, lines.Count);
-        Check.That(lines[0].Contains("skipped") && lines[0].Contains("kit"), lines[0]);
+        Check.That(lines[0].Contains("skipped, potion kit"), lines[0]);
+    }
+
+    [Test]
+    public void CalibrationNamesAMonsterKit()
+    {
+        var (calibration, lines) = Make();
+        calibration.Observe(Round(3, [Group(0, 201)], [new VoraxCard(0, 1, VoraxCardKind.Bundle, 0)], 0));
+        calibration.Observe(Round(4, [Group(0, 201, 36, 12)]));
+        Check.That(lines[0].Contains("skipped, monster kit"), lines[0]);
     }
 
     [Test]

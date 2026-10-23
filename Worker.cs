@@ -6,7 +6,7 @@ using Vorax.Sim;
 
 namespace Vorax;
 
-// A settings change means a new Engine and a new Worker. No timeout on a looping strategy: only the generation check drops its late result.
+// The key covers the decision only, not the live selection. A settings change means a new Engine and a new Worker. No timeout on a looping strategy: only the generation check drops its late result.
 public sealed class Worker(Engine engine) : IDisposable
 {
     sealed record Key(string State, Strategy? Strategy);
@@ -15,7 +15,6 @@ public sealed class Worker(Engine engine) : IDisposable
 
     readonly object gate = new();
     readonly SemaphoreSlim wake = new(0);
-    readonly RunTracker tracker = new();
     Thread? thread;
     Job? pending;
     Key? submitted;
@@ -39,13 +38,12 @@ public sealed class Worker(Engine engine) : IDisposable
         lock (gate) return advice is not null && resultKey!.State == stateKey;
     }
 
-    public void Submit(VoraxState state, Strategy? strategy)
+    public void Submit(VoraxState state, Strategy? strategy, MapOptions options)
     {
         var key = new Key(StateKey(state), strategy);
         lock (gate)
         {
             if (disposed) return;
-            var options = tracker.Update(state);
             if (key == submitted) return;
             submitted = key;
             advice = null;
@@ -113,16 +111,16 @@ public sealed class Worker(Engine engine) : IDisposable
         }
     }
 
-    static string StateKey(VoraxState state)
+    string StateKey(VoraxState state)
     {
+        var stage = engine.DetectStage(state);
         var key = new StringBuilder();
-        key.Append(state.Phase).Append('|').Append(state.Round).Append('|').Append(state.Rerolls).Append('|').Append(state.SelectedCard).Append("|o");
+        key.Append(stage).Append('|').Append(state.Phase).Append('|').Append(state.Round).Append('|').Append(state.Rerolls).Append('|').Append(stage == Stage.Target ? state.SelectedCard : -1).Append("|o");
         foreach (var card in state.Offered) key.Append(' ').Append(card.Slot).Append(':').Append(card.Id).Append(':').Append((int)card.Kind);
         key.Append("|i");
         foreach (var card in state.Instruments) key.Append(' ').Append(card.Id);
         key.Append("|m");
         foreach (var m in state.Monsters) key.Append(' ').Append(m.Slot).Append(':').Append(m.Species).Append(':').Append(m.Rarity).Append(':').Append(m.Activity).Append(':').Append(m.Count);
-        key.Append("|s").AppendJoin(' ', state.SelectedMonsters);
         return key.ToString();
     }
 }
