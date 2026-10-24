@@ -20,6 +20,7 @@ public sealed class Main : Plugin<Settings>
     int _unusedWidth, _unusedHeight;
     readonly Calibration _calibration = new(Log.Info);
     readonly RunTracker _tracker = new();
+    readonly RunLog _runLog = new(Log.Info);
     Worker? _worker;
     (int, int, int) _workerKey;
 
@@ -32,16 +33,24 @@ public sealed class Main : Plugin<Settings>
     public override void Tick()
     {
         Game.WantVorax();
-        if (!Settings.Enabled || Game.State.Vorax is not { } state) return;
+        if (!Settings.Enabled) return;
+        if (Game.State.Vorax is not { } state)
+        {
+            _runLog.Observe(null, null);
+            return;
+        }
+
         var key = (Settings.ClampedRollouts, Settings.ClampedBudget, Settings.ClampedMargin);
         if (_worker is null || key != _workerKey)
         {
             if (_worker is { } old) Task.Run(old.Dispose);
             _workerKey = key;
             _worker = new(new Engine(new(key.Item1, key.Item2, key.Item3 / 100.0), new Rng((ulong)Environment.TickCount64)));
+            _runLog.Config = $"rollouts={key.Item1} budgetMs={key.Item2} marginPct={key.Item3}";
         }
 
         _worker.Submit(state, StrategyFor(Settings.Mode), _tracker.Update(state));
+        _runLog.Observe(state, _worker.Matches(state) ? _worker.Latest : null);
         if (Settings.Debug) _calibration.Observe(state);
     }
 
