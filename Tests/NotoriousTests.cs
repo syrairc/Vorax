@@ -165,4 +165,18 @@ public sealed class NotoriousTests
         Check.Equal(AdviceSource.Strategy, instrument.Source);
         Check.That(instrument.Pick.Indexes is [0 or 1]);
     }
+
+    [Test]
+    public void TliOverlayPlusIsRegisteredAndDealsKitsLessOftenThanTheFork()
+    {
+        Check.That(Registry.ByName("TLI Overlay Plus") is not null);
+        int Kits(DrawProfile profile)
+        {
+            var rng = new Rng(7);
+            var kits = 0;
+            for (var i = 0; i < 4000; i++) kits += DrawModel.DrawHand(rng, 3, null, profile).Count(DrawModel.IsKit);
+            return kits;
+        }
+        Check.That(Kits(DrawModel.OverlayPlus) * 2 < Kits(DrawModel.Standard));
+    }
 }
