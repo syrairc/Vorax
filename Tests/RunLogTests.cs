@@ -140,4 +140,19 @@ public sealed class RunLogTests
         log.Observe(Board(1), null);
         Check.Equal("start end start", string.Join(" ", lines.Select(Event)));
     }
+
+    [Test]
+    public void ScreensWithoutAdviceAreSnapshottedAndDoNotEndTheRun()
+    {
+        var (log, lines) = Make();
+        VoraxState Final(int activity) => Board(10, activity, phase: VoraxPhase.Other) with { State = "S13FinalPlay" };
+        log.Observe(Board(10, 100), null);
+        log.Observe(Final(100), null);
+        log.Observe(Final(100), null);
+        log.Observe(Final(900), null);
+        Check.Equal("start stage stage", string.Join(" ", lines.Select(Event)));
+        Check.That(lines[1].Contains("S13FinalPlay") && lines[2].Contains("\"activity\":900"), lines[2]);
+        log.Observe(null, null);
+        Check.Equal("end", Event(lines[^1]));
+    }
 }

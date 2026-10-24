@@ -15,12 +15,13 @@ public sealed class RunLog(Action<string> log)
     VoraxState? last;
     Advice? logged;
     string decisionKey = "";
+    string stageKey = "";
 
     public string Config { get; set; } = "";
 
     public void Observe(VoraxState? state, Advice? advice)
     {
-        if (state is null || state.Phase == VoraxPhase.Other)
+        if (state is null)
         {
             End();
             return;
@@ -33,6 +34,7 @@ public sealed class RunLog(Action<string> log)
         }
 
         Track(state);
+        EmitStage(state);
         Decide(state, advice);
         last = state;
     }
@@ -51,6 +53,17 @@ public sealed class RunLog(Action<string> log)
         last = null;
         logged = null;
         decisionKey = "";
+        stageKey = "";
+    }
+
+    // Screens the advisor has no rule for (the final battle, rewards): snapshot the board whenever it changes so the log still shows them
+    void EmitStage(VoraxState state)
+    {
+        if (state.Phase != VoraxPhase.Other) return;
+        var key = $"{state.State}|{state.Round}|{state.Activity}|{state.SelectedCard}|{string.Join(',', state.Offered.Select(c => c.Id))}";
+        if (key == stageKey) return;
+        stageKey = key;
+        Emit("stage", new { state = state.State, round = state.Round, activity = state.Activity, rewards = state.RewardsTaken, selected = state.SelectedCard, offered = state.Offered.Select(Card), instruments = state.Instruments.Select(c => c.Id), monsters = Monsters(state) });
     }
 
     void Decide(VoraxState state, Advice? advice)
@@ -68,6 +81,7 @@ public sealed class RunLog(Action<string> log)
         {
             round = state.Round,
             stage = advice.Stage.ToString(),
+            state = state.State,
             activity = state.Activity,
             next = state.NextRewardActivity,
             rewards = state.RewardsTaken,

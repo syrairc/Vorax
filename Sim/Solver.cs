@@ -79,6 +79,12 @@ public static class Solver
         return new(values, BestIndex(values), 0, false);
     }
 
+    public static double ValueOfTargets(SimState state, int potionSimId, IReadOnlyList<int> targets, SolveSettings settings, Func<SimState, double>? score, Rng rng)
+    {
+        var run = new Run(settings, score, rng);
+        return run.Mean(1, 1.0, _ => run.PlayThenFinish(state, potionSimId, targets))[0];
+    }
+
     public static IReadOnlyList<int> BestTargets(SimState state, int potionSimId, SolveSettings settings, Func<SimState, double>? score, Rng rng)
     {
         var options = TargetOptions(state, potionSimId);
