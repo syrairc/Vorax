@@ -81,7 +81,7 @@ public sealed class Main : Plugin<Settings>
 
     void DrawBar(VoraxState state, Advice? advice)
     {
-        if (state.Offered.Length == 0) return;
+        if (state.Offered.Length == 0 || state.Phase == VoraxPhase.Other) return;
         var style = Settings.BarText;
         var rowHeight = Draw.RowHeight(style);
         var barHeight = Math.Max(4f, rowHeight * 0.3f);
@@ -166,7 +166,8 @@ public sealed class Main : Plugin<Settings>
         var rows = new List<(string, string, Color)>();
         if (advice is null)
         {
-            if (state.Offered.Length > 0) rows.Add(("Advice", "thinking...", GameColors.TextDim));
+            if (state.Phase == VoraxPhase.Other) rows.Add(("Advice", "none for this screen", GameColors.TextDim));
+            else if (state.Offered.Length > 0) rows.Add(("Advice", "thinking...", GameColors.TextDim));
             return rows;
         }
 

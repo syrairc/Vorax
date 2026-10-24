@@ -155,4 +155,16 @@ public sealed class RunLogTests
         log.Observe(null, null);
         Check.Equal("end", Event(lines[^1]));
     }
+
+    [Test]
+    public void ATakenProtocolIsRecordedWithTheOffer()
+    {
+        var (log, lines) = Make();
+        var offered = new[] { new VoraxCard(0, 3, VoraxCardKind.Modifier, 3) { Name = "Laser Amputation" }, new VoraxCard(1, 13, VoraxCardKind.Modifier, 0) { Name = "Live Leech Therapy" } };
+        log.Observe(Board(11, offered: offered, phase: VoraxPhase.Other), null);
+        log.Observe(Board(11, phase: VoraxPhase.Other) with { Protocols = [offered[1]] }, null);
+        var line = lines.Single(l => Event(l) == "protocol");
+        Check.That(line.Contains("Live Leech Therapy") && line.Contains("Laser Amputation"), line);
+    }
 }
+

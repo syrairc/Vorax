@@ -113,6 +113,9 @@ public sealed class RunLog(Action<string> log)
             Emit("instrument", new { round = state.Round, id, index, followed = Followed(Stage.Instrument, a => a.Pick.Indexes is [var i] && i == index) });
         }
 
+        foreach (var card in state.Protocols.Where(c => before.Protocols.All(o => o.Id != c.Id)))
+            Emit("protocol", new { round = state.Round, card = Card(card), offered = before.Offered.Select(Card) });
+
         if (state.Round > before.Round)
         {
             Emit("round", new { from = before.Round, to = state.Round, activity = state.Activity, gained = state.Activity - before.Activity, rewards = state.RewardsTaken, rerolls = state.Rerolls, instruments = state.Instruments.Select(c => c.Id), monsters = Monsters(state) });

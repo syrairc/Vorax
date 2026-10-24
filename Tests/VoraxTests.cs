@@ -230,5 +230,14 @@ public sealed class VoraxTests
         Check.Equal(0, Frame(Sample(), new Settings { ShowPanel = false, ShowHighlights = false, ShowBar = false }, advice));
         Check.Equal(0, Frame(Sample() with { Offered = [] }, settings, advice));
     }
+
+    [Test]
+    public void ScreensWithoutAdviceShowNoBarAndNoThinkingRow()
+    {
+        var other = Sample() with { Phase = VoraxPhase.Other };
+        Check.Equal(0, Frame(other, new Settings { ShowPanel = false, ShowHighlights = false }));
+        var row = Main.AdviceRows(other, null).Single();
+        Check.That(row.Right == "none for this screen", row.Right);
+    }
 }
 
