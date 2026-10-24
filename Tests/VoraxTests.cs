@@ -49,7 +49,7 @@ public sealed class VoraxTests
     public void RenderDrawsThePanel() => Check.That(Frame(Sample()) > 0, "panel drew");
 
     [Test]
-    public void RenderHiddenWhenPanelOff() => Check.Equal(0, Frame(Sample(), new Settings { ShowPanel = false }));
+    public void RenderHiddenWhenPanelOff() => Check.Equal(0, Frame(Sample(), new Settings { ShowPanel = false, ShowBar = false }));
 
     [Test]
     public void RowsListEveryValue()
@@ -74,7 +74,7 @@ public sealed class VoraxTests
     {
         var advice = Potion();
         Check.That(Frame(WithRects(), new Settings { ShowPanel = false }, advice) > 0, "marks drew without the panel");
-        Check.Equal(0, Frame(WithRects(), new Settings { ShowPanel = false, ShowHighlights = false }, advice));
+        Check.Equal(0, Frame(WithRects(), new Settings { ShowPanel = false, ShowHighlights = false, ShowBar = false }, advice));
         Check.That(Frame(WithRects(), new Settings(), advice) > Frame(WithRects(), new Settings { ShowHighlights = false }, advice), "marks add vertices");
     }
 
@@ -208,4 +208,27 @@ public sealed class VoraxTests
         Check.Equal(0, new Settings { RerollMargin = -3 }.ClampedMargin);
         Check.Equal(100, new Settings { RerollMargin = 900 }.ClampedMargin);
     }
+
+    [Test]
+    public void TheBarShowsThePickAndTheEstimate()
+    {
+        var state = Sample();
+        var advice = new Advice(Stage.Potion, AdviceSource.Strategy, "X", Pick.One(0, ""), null, null, null, 773771);
+        Check.Equal("Eggshell Powder", Main.PickText(state, advice));
+        Check.Equal("Est. 773,771", Main.BarScore(advice));
+        Check.Equal("thinking...", Main.PickText(state, null));
+        Check.Equal("Est. -", Main.BarScore(null));
+        Check.Equal("Reroll", Main.PickText(state, advice with { Pick = Pick.Reroll("") }));
+    }
+
+    [Test]
+    public void TheBarDrawsOnlyWhenACardIsOffered()
+    {
+        var advice = new Advice(Stage.Potion, AdviceSource.Strategy, "X", Pick.One(0, ""), null, null, null, 773771);
+        var settings = new Settings { ShowPanel = false, ShowHighlights = false };
+        Check.That(Frame(Sample(), settings, advice) > 0, "bar drew");
+        Check.Equal(0, Frame(Sample(), new Settings { ShowPanel = false, ShowHighlights = false, ShowBar = false }, advice));
+        Check.Equal(0, Frame(Sample() with { Offered = [] }, settings, advice));
+    }
 }
+

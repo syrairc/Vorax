@@ -81,6 +81,49 @@ public sealed class EngineTests
     }
 
     [Test]
+    public void TheEngineEstimatesTheFinalScoreOfAStrategyPick()
+    {
+        var strategy = new Scripted(potion: _ => Pick.One(1, "mine"));
+        var advice = NewEngine().Advise(Hand([Potion(Xenopurge), Potion(204)], XenopurgeBoard()), strategy, default)!;
+        Check.Equal(AdviceSource.Strategy, advice.Source);
+        Check.That(advice.Expected is > 0, $"expected {advice.Expected}");
+    }
+
+    [Test]
+    public void TheEstimateForTheSimulatorIsTheBestValue()
+    {
+        var advice = NewEngine().Advise(Hand([Potion(Xenopurge), Potion(204)], XenopurgeBoard(), rerolls: 0), null, default)!;
+        Check.That(advice.Expected is { } e && e == advice.Values!.Max(), $"expected {advice.Expected}");
+    }
+
+    [Test]
+    public void TheEstimateCoversATargetPick()
+    {
+        var state = Hand([Potion(Xenopurge)], XenopurgeBoard(), selected: 0);
+        var advice = NewEngine().Advise(state, new Scripted(target: _ => new([2], "mine")), default)!;
+        Check.Equal(Stage.Target, advice.Stage);
+        Check.That(advice.Expected is > 0, $"expected {advice.Expected}");
+    }
+
+    [Test]
+    public void TheEstimateCoversAnInstrumentAndARerollPick()
+    {
+        var instrument = NewEngine().Advise(Hand([InstrumentCard(101), InstrumentCard(102)], XenopurgeBoard(), phase: VoraxPhase.Instrument), new Scripted(instrument: _ => Pick.One(1, "mine")), default)!;
+        Check.That(instrument.Expected is > 0, $"instrument {instrument.Expected}");
+        var reroll = NewEngine().Advise(Hand([Potion(Xenopurge), Potion(204)], XenopurgeBoard()), new Scripted(potion: _ => Pick.Reroll("mine")), default)!;
+        Check.That(reroll.Pick.IsReroll && reroll.Expected is > 0, $"reroll {reroll.Expected}");
+    }
+
+    [Test]
+    public void ProgressRunsWhileAdvisingAndEndsAtOne()
+    {
+        var engine = NewEngine();
+        Check.That(!engine.Progress.Active);
+        engine.Advise(Hand([Potion(Xenopurge), Potion(204)], XenopurgeBoard()), null, default);
+        Check.That(!engine.Progress.Active && engine.Progress.Fraction == 1);
+    }
+
+    [Test]
     public void NoStrategyUsesTheSimulator()
     {
         var advice = NewEngine().Advise(Hand([Potion(Xenopurge), Potion(204)], XenopurgeBoard()), null, default)!;

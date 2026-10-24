@@ -97,6 +97,7 @@ public sealed class RunLog(Action<string> log)
             reason = advice.Pick.Reason,
             values = advice.Values?.Select(v => Math.Round(v)),
             rerollValue = advice.RerollValue is { } r ? Math.Round(r) : (double?)null,
+            expected = advice.Expected is { } e ? Math.Round(e) : (double?)null,
             error = advice.Error,
             ms = clock.ElapsedMilliseconds,
         });
